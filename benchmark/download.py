@@ -331,6 +331,28 @@ def download_dataset(name: str, root: Path) -> bool:
     return False
 
 
+def preprocess_dataset(name: str, root: Path):
+    """Force preprocessing of a dataset: .mat → PCA → patch → .npz cache."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from benchmark.datasets.registry import get_dataset, DATASETS
+    if name not in DATASETS:
+        print(f"  [SKIP] {name}: not in registry")
+        return
+    ds_dir = root / name
+    if not ds_dir.exists():
+        print(f"  [SKIP] {name}: directory not found ({ds_dir})")
+        return
+    print(f"\n{'='*60}")
+    print(f"Preprocessing: {name}")
+    try:
+        ds = get_dataset(name, root=ds_dir)
+        _ = ds.train   # triggers _load_and_cache → saves .npz
+        print(f"  [OK] train={len(ds.train)} test={len(ds.test)} samples")
+    except Exception as e:
+        print(f"  [ERROR] {e}")
+
+
 def main():
     p = argparse.ArgumentParser(description="RS-CIL Dataset Downloader")
     p.add_argument("--dataset", default="all",
@@ -339,6 +361,8 @@ def main():
                    help="Root directory for dataset storage (default: ~/datasets/rs_cil).")
     p.add_argument("--list", action="store_true",
                    help="List available datasets and exit.")
+    p.add_argument("--preprocess", action="store_true",
+                   help="After downloading, convert .mat → .npz cache (PCA + patches).")
     args = p.parse_args()
 
     if args.list:
@@ -362,6 +386,13 @@ def main():
     for name, ok in results.items():
         status = "OK " if ok else "FAIL"
         print(f"  [{status}] {name}")
+
+    if args.preprocess:
+        print(f"\n{'='*60}")
+        print("Preprocessing (mat → npz) ...")
+        for name in targets:
+            if results.get(name):
+                preprocess_dataset(name, root)
 
 
 if __name__ == "__main__":
