@@ -218,6 +218,7 @@ def _build_method(name: str, protocol: CILProtocol, device, datasets):
         "podnet":   lambda: _import("benchmark.methods.podnet",   "PODNet")(**kwargs),
         "acil":     lambda: _import("benchmark.methods.acil",     "ACIL")(**kwargs),
         "gpm":      lambda: _import("benchmark.methods.gpm",      "GPM")(**kwargs),
+        "bic":      lambda: _import("benchmark.methods.bic",      "BiC")(**kwargs),
     }
 
     if name not in registry:

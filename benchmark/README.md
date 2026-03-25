@@ -61,6 +61,7 @@ All 10 datasets download automatically via `download.py` (no registration requir
 | `podnet` | Replay + Distill | ✓ | PODNet (Douillard et al., ECCV 2020) |
 | `der` | Replay + KD | ✓ | DER++ (Buzzega et al., NeurIPS 2020) |
 | `gdumb` | Replay (greedy) | ✓ | GDumb (Prabhu et al., ECCV 2020) |
+| `bic` | Replay + Bias Correction | ✓ | BiC (Wu et al., CVPR 2019) |
 
 ---
 
