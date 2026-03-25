@@ -1,0 +1,126 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{rebuffi2017icarl,kirkpatrick2017ewc,li2017lwf}
+\citation{deng2024dcprn,xu2025crossacl}
+\citation{chen2016deep3dcnn}
+\citation{xu2024mivit}
+\citation{hong2022multimodal}
+\citation{yao2024spectralgpt}
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{I}{1}{Introduction}{section.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {I-}0a}Motivation: Spectral features are inherently more stable.}{1}{paragraph.1.0.0.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {I-}0b}Our approach.}{1}{paragraph.1.0.0.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {I-}0c}Contributions.}{1}{paragraph.1.0.0.3}\protected@file@percent }
+\citation{kirkpatrick2017ewc}
+\citation{li2017lwf}
+\citation{rebuffi2017icarl}
+\citation{hou2019lucir}
+\citation{wang2022foster}
+\citation{deng2024dcprn}
+\citation{xu2025crossacl}
+\citation{pscen2025}
+\citation{wang2022l2p}
+\citation{wang2022dualprompt}
+\citation{smith2023codaprompt}
+\citation{liang2024inflora}
+\citation{sdlora2025}
+\citation{zhou2024ease}
+\citation{amoed2026}
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{2}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{II}{2}{Related Work}{section.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {II-}0a}Hyperspectral Image Classification.}{2}{paragraph.2.0.0.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {II-}0b}Class-Incremental Learning.}{2}{paragraph.2.0.0.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {II-}0c}Parameter-Efficient Fine-Tuning for Continual Learning.}{2}{paragraph.2.0.0.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {II-}0d}Remote Sensing Continual Learning.}{2}{paragraph.2.0.0.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {III}Method}{2}{section.3}\protected@file@percent }
+\newlabel{sec:method}{{III}{2}{Method}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Problem Formulation: Marathon CIL}{2}{subsection.3.1}\protected@file@percent }
+\newlabel{sec:protocol}{{\mbox  {III-A}}{2}{Problem Formulation: Marathon CIL}{subsection.3.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Cross-domain feature drift of S\textsuperscript  {2}CM{} branches (cosine distance, lower = more stable). Spectral features are consistently the most stable across all domain pairs.}}{2}{table.caption.1}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:drift}{{I}{2}{Cross-domain feature drift of \backbonename {} branches (cosine distance, lower = more stable). Spectral features are consistently the most stable across all domain pairs}{table.caption.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Cross-Domain Feature Drift Analysis}{2}{subsection.3.2}\protected@file@percent }
+\newlabel{sec:drift}{{\mbox  {III-B}}{2}{Cross-Domain Feature Drift Analysis}{subsection.3.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-B}0a}Finding 1: Spectral features drift less than spatial features.}{2}{paragraph.3.2.0.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-B}0b}Finding 2: LiDAR features drift the most.}{2}{paragraph.3.2.0.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-B}0c}Finding 3: S\textsuperscript  {2}CM{} branch-wise drift confirms the design.}{2}{paragraph.3.2.0.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}S\textsuperscript  {2}CM{} Backbone}{2}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:backbone}{{\mbox  {III-C}}{2}{\backbonename {} Backbone}{subsection.3.3}{}}
+\citation{shine2024}
+\citation{kirkpatrick2017ewc}
+\citation{li2017lwf}
+\citation{xu2025crossacl}
+\citation{pscen2025}
+\citation{wang2022foster}
+\citation{deng2024dcprn}
+\citation{rebuffi2017icarl}
+\citation{hou2019lucir}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}AnchorLoRA{}: Spectral-Anchored Low-Rank Adaptation}{3}{subsection.3.4}\protected@file@percent }
+\newlabel{sec:anchorlora}{{\mbox  {III-D}}{3}{\methodname {}: Spectral-Anchored Low-Rank Adaptation}{subsection.3.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-D}0a}Phase 1: Warm-up (Tasks 0 to $W{-}1$).}{3}{paragraph.3.4.0.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-D}0b}Phase 2: Incremental LoRA (Tasks $W$ onward).}{3}{paragraph.3.4.0.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-D}0c}Accumulated inference.}{3}{paragraph.3.4.0.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-D}0d}Classification.}{3}{paragraph.3.4.0.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Experiments}{3}{section.4}\protected@file@percent }
+\newlabel{sec:experiments}{{IV}{3}{Experiments}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Setup}{3}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0a}Datasets.}{3}{paragraph.4.1.0.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0b}Marathon CIL protocol.}{3}{paragraph.4.1.0.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Marathon CIL results on S\textsuperscript  {2}CM backbone (9 tasks, 32 classes). Best exemplar-free result in \textbf  {bold}. EF=Exemplar-Free, PR=Pseudo-Replay, EB=Exemplar-Based.}}{3}{table.caption.2}\protected@file@percent }
+\newlabel{tab:main}{{II}{3}{Marathon CIL results on S\textsuperscript {2}CM backbone (9 tasks, 32 classes). Best exemplar-free result in \textbf {bold}. EF=Exemplar-Free, PR=Pseudo-Replay, EB=Exemplar-Based}{table.caption.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0c}Implementation.}{3}{paragraph.4.1.0.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-A}0d}Baselines.}{3}{paragraph.4.1.0.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Main Results}{3}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Cross-Backbone Comparison}{3}{subsection.4.3}\protected@file@percent }
+\bibstyle{IEEEtran}
+\bibdata{references}
+\bibcite{rebuffi2017icarl}{1}
+\bibcite{kirkpatrick2017ewc}{2}
+\bibcite{li2017lwf}{3}
+\bibcite{deng2024dcprn}{4}
+\bibcite{xu2025crossacl}{5}
+\bibcite{chen2016deep3dcnn}{6}
+\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Cross-backbone comparison. S\textsuperscript  {2}CM{}'s spectral-spatial separation enables AnchorLoRA{}'s asymmetric adaptation.}}{4}{table.caption.3}\protected@file@percent }
+\newlabel{tab:crossbb}{{III}{4}{Cross-backbone comparison. \backbonename {}'s spectral-spatial separation enables \methodname {}'s asymmetric adaptation}{table.caption.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {IV}{\ignorespaces Ordering robustness. AnchorLoRA{} improves over SHINE baseline across 3 representative domain orderings.}}{4}{table.caption.4}\protected@file@percent }
+\newlabel{tab:ordering}{{IV}{4}{Ordering robustness. \methodname {} improves over SHINE baseline across 3 representative domain orderings}{table.caption.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Domain Ordering Robustness}{4}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}Ablation Study}{4}{subsection.4.5}\protected@file@percent }
+\newlabel{sec:ablation}{{\mbox  {IV-E}}{4}{Ablation Study}{subsection.4.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-E}0a}Orthogonal constraints hurt.}{4}{paragraph.4.5.0.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-E}0b}Spectral KD is ineffective.}{4}{paragraph.4.5.0.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-E}0c}Asymmetric rank is critical.}{4}{paragraph.4.5.0.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-E}0d}Routing and dual-head designs fail.}{4}{paragraph.4.5.0.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {V}{\ignorespaces Ablation study on the Marathon CIL benchmark (seed 0).}}{4}{table.caption.5}\protected@file@percent }
+\newlabel{tab:ablation}{{V}{4}{Ablation study on the Marathon CIL benchmark (seed 0)}{table.caption.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-E}0e}Domain-selective LoRA hurts.}{4}{paragraph.4.5.0.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {V}Conclusion}{4}{section.5}\protected@file@percent }
+\newlabel{sec:conclusion}{{V}{4}{Conclusion}{section.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {V-}0a}Limitations.}{4}{paragraph.5.0.0.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {V-}0b}Future work.}{4}{paragraph.5.0.0.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{References}{4}{section*.6}\protected@file@percent }
+\bibcite{xu2024mivit}{7}
+\bibcite{hong2022multimodal}{8}
+\bibcite{yao2024spectralgpt}{9}
+\bibcite{hou2019lucir}{10}
+\bibcite{wang2022foster}{11}
+\bibcite{pscen2025}{12}
+\bibcite{wang2022l2p}{13}
+\bibcite{wang2022dualprompt}{14}
+\bibcite{smith2023codaprompt}{15}
+\bibcite{liang2024inflora}{16}
+\bibcite{sdlora2025}{17}
+\bibcite{zhou2024ease}{18}
+\bibcite{amoed2026}{19}
+\bibcite{shine2024}{20}
+\@writefile{toc}{\contentsline {section}{Appendix}{5}{section*.7}\protected@file@percent }
+\newlabel{app:pertask}{{A}{5}{\appendixname }{section*.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {VI}{\ignorespaces Per-task accuracy progression on the default Marathon CIL ordering.}}{5}{table.caption.8}\protected@file@percent }
+\newlabel{tab:pertask}{{VI}{5}{Per-task accuracy progression on the default Marathon CIL ordering}{table.caption.8}{}}
+\newlabel{app:forgetting}{{A}{5}{\appendixname }{table.caption.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {VII}{\ignorespaces Per-domain forgetting for AnchorLoRA{}+SHINE.}}{5}{table.caption.9}\protected@file@percent }
+\newlabel{tab:forgetting}{{VII}{5}{Per-domain forgetting for \methodname {}+SHINE}{table.caption.9}{}}
+\newlabel{app:negative}{{A}{5}{\appendixname }{table.caption.9}{}}
+\gdef \@abspage@last{5}

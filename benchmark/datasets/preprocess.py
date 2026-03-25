@@ -98,6 +98,31 @@ def build_labels(counts_per_class: list[int]) -> np.ndarray:
     return np.array(labels, dtype=np.int64)
 
 
+# ── Index-based split helper (rs-fusion-datasets-dist format) ────
+
+def index_to_label_maps(
+    gt: np.ndarray,        # (N,) label array for all labeled pixels (1-indexed)
+    tr_idx: np.ndarray,    # (N_tr,) 0-based indices into gt for training pixels
+    te_idx: np.ndarray,    # (N_te,) 0-based indices into gt for test pixels
+    coords: np.ndarray,    # (N, 2) row/col coordinates for all labeled pixels
+    H: int, W: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert coordinate+index split into TR/TE label maps.
+
+    Used by Houston2018, Augsburg, Berlin (rs-fusion-datasets-dist format).
+    Returns tr_map and te_map of shape (H, W) with values 1..K or 0.
+    """
+    tr_map = np.zeros((H, W), dtype=np.int32)
+    te_map = np.zeros((H, W), dtype=np.int32)
+    for i in tr_idx.ravel():
+        r, c = coords[i]
+        tr_map[r, c] = int(gt[i])
+    for i in te_idx.ravel():
+        r, c = coords[i]
+        te_map[r, c] = int(gt[i])
+    return tr_map, te_map
+
+
 # ── Full pipeline ─────────────────────────────────────────────────
 
 def preprocess_hsi_lidar(

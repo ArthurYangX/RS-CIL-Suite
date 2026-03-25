@@ -147,7 +147,9 @@ def run(args):
             "final_aa":    result.final_aa,
             "final_kappa": result.final_kappa,
             "bwt":         result.bwt,
+            "fwt":         result.fwt,
             "forgetting":  result.forgetting,
+            "plasticity":  result.plasticity,
             "tasks": [
                 {"task_id": r.task_id, "oa": r.oa, "avg_aa": r.avg_aa,
                  "kappa": r.kappa, "per_dataset": r.per_dataset}

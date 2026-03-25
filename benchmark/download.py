@@ -26,125 +26,131 @@ from pathlib import Path
 DATASET_SOURCES: dict[str, dict] = {
 
     # ── HSI + LiDAR ───────────────────────────────────────────────
+    # All four HSI+LiDAR datasets are available via rs-fusion-datasets-dist
+    # (pre-processed to unified .mat format with TRLabel/TSLabel or index files)
+    # Release URL: https://github.com/songyz2019/rs-fusion-datasets-dist/releases/tag/v1.0.0
 
     "Trento": {
         "desc": "Trento HSI+LiDAR (6 classes, 166×600)",
-        "method": "gdrive",
-        "files": {
-            # MDL-RS dataset package (Hong et al., IEEE TGRS 2020)
-            "gdrive_id": "1A0MnMrFEPgSMqS2MN3sMDDyiD_SHJrx8",  # MDL-RS zip
-            "zip_name":  "MDL-RS.zip",
-            "extract_dir": "Trento",
-            "note": "Contains Trento, Houston2013, MUUFL in one zip.",
-        },
-        "manual_url": "https://github.com/danfenghong/IEEE_TGRS_MDL-RS",
+        "method": "direct_zip",
+        "zip_url": "https://github.com/tyust-dayu/Trento/archive/b4afc449.zip",
+        "zip_name": "Trento.zip",
+        "extract_dir": "Trento",
+        "expected_files": ["HSI.mat", "LiDAR.mat", "TRLabel.mat", "TSLabel.mat"],
+        "manual_url": "https://github.com/tyust-dayu/Trento",
     },
 
     "Houston2013": {
         "desc": "Houston 2013 HSI+LiDAR (15 classes, 349×1905)",
-        "method": "shared",  # included in MDL-RS zip above
+        "method": "direct_zip",
+        "zip_url": (
+            "https://github.com/songyz2019/rs-fusion-datasets-dist/"
+            "releases/download/v1.0.0/houston2013-mmr.zip"
+        ),
+        "zip_name": "houston2013.zip",
         "extract_dir": "Houston2013",
-        "manual_url": "https://hyperspectral.ee.uh.edu/?page_id=459",
+        "expected_files": ["HSI.mat", "LiDAR.mat", "TRLabel.mat", "TSLabel.mat"],
+        "manual_url": "https://github.com/songyz2019/rs-fusion-datasets-dist",
     },
 
     "MUUFL": {
         "desc": "MUUFL Gulfport HSI+LiDAR (11 classes, 325×220)",
-        "method": "gdrive",
-        "files": {
-            "gdrive_id": "1A0MnMrFEPgSMqS2MN3sMDDyiD_SHJrx8",
-            "zip_name":  "MDL-RS.zip",
-            "extract_dir": "MUUFL",
-        },
-        "manual_url": "https://github.com/danfenghong/IEEE_TGRS_MDL-RS",
+        "method": "direct_zip",
+        "zip_url": (
+            "https://github.com/GatorSense/MUUFLGulfport/"
+            "archive/refs/tags/v0.1.zip"
+        ),
+        "zip_name": "MUUFL.zip",
+        "extract_dir": "MUUFL",
+        "expected_files": ["muufl_gulfport_campus_w_lidar_1.mat"],
+        "note": (
+            "Main file: muufl_gulfport_campus_w_lidar_1.mat inside "
+            "MUUFLGulfportDataCollection/. Labels in MUUFLGulfportSceneLabels/."
+        ),
+        "manual_url": "https://github.com/GatorSense/MUUFLGulfport",
     },
 
     "Augsburg": {
-        "desc": "Augsburg HSI+LiDAR (7 classes, 332×485)",
-        "method": "gdrive",
-        "files": {
-            # Hong et al., IEEE TGRS 2021 (MFT paper supplementary)
-            "gdrive_id": "1EHSoNeS-U4e7K2MjlrfLEG3e1C0h6Ya3",
-            "zip_name":  "Augsburg.zip",
-            "extract_dir": "Augsburg",
-        },
-        "manual_url": "https://github.com/danfenghong/IEEE_TGRS_MFT",
+        "desc": "Augsburg HSI+SAR+DSM (8 classes, 332×485)",
+        "method": "direct_zip",
+        "zip_url": (
+            "https://github.com/songyz2019/rs-fusion-datasets-dist/"
+            "releases/download/v1.0.0/augsburg-ouc.zip"
+        ),
+        "zip_name": "augsburg.zip",
+        "extract_dir": "Augsburg",
+        "expected_files": ["augsburg_hsi.mat", "augsburg_sar.mat",
+                           "augsburg_gt.mat", "augsburg_index.mat"],
+        "manual_url": "https://github.com/songyz2019/rs-fusion-datasets-dist",
     },
 
     "Houston2018": {
-        "desc": "Houston 2018 HSI+LiDAR (20 classes, 601×2384)",
-        "method": "manual",
-        "manual_url": "https://hyperspectral.ee.uh.edu/?page_id=1075",
-        "note": (
-            "Requires IEEE GRSS Data Fusion Contest registration. "
-            "After downloading, place Phase2_*.mat files in $ROOT/Houston2018/"
+        "desc": "Houston 2018 HSI+LiDAR (20 classes, 1202×4768)",
+        "method": "direct_zip",
+        "zip_url": (
+            "https://github.com/songyz2019/rs-fusion-datasets-dist/"
+            "releases/download/v1.0.0/houston2018-ouc.zip"
         ),
+        "zip_name": "houston2018.zip",
+        "extract_dir": "Houston2018",
+        "expected_files": ["houston_hsi.mat", "houston_lidar.mat",
+                           "houston_gt.mat", "houston_index.mat"],
+        "manual_url": "https://github.com/songyz2019/rs-fusion-datasets-dist",
     },
 
     # ── HSI only ──────────────────────────────────────────────────
+    # Available on HuggingFace (danaroth mirror — direct .mat download)
 
     "IndianPines": {
         "desc": "Indian Pines AVIRIS (16 classes, 145×145)",
-        "method": "direct",
+        "method": "huggingface",
+        "hf_repo": "danaroth/indian_pines",
         "files": [
-            {
-                "url": "https://www.ehu.eus/ccwintco/uploads/6/67/Indian_pines_corrected.mat",
-                "dest": "Indian_pines_corrected.mat",
-            },
-            {
-                "url": "https://www.ehu.eus/ccwintco/uploads/c/c4/Indian_pines_gt.mat",
-                "dest": "Indian_pines_gt.mat",
-            },
+            "Indian_pines_corrected.mat",
+            "Indian_pines_gt.mat",
         ],
         "extract_dir": "IndianPines",
-        "manual_url": "http://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes",
+        "manual_url": "https://huggingface.co/datasets/danaroth/indian_pines",
     },
 
     "PaviaU": {
         "desc": "Pavia University ROSIS (9 classes, 610×340)",
-        "method": "direct",
+        "method": "huggingface",
+        "hf_repo": "danaroth/pavia",
         "files": [
-            {
-                "url": "https://www.ehu.eus/ccwintco/uploads/e/ee/PaviaU.mat",
-                "dest": "PaviaU.mat",
-            },
-            {
-                "url": "https://www.ehu.eus/ccwintco/uploads/5/50/PaviaU_gt.mat",
-                "dest": "PaviaU_gt.mat",
-            },
+            "PaviaU.mat",
+            "PaviaU_gt.mat",
         ],
         "extract_dir": "PaviaU",
-        "manual_url": "http://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes",
+        "manual_url": "https://huggingface.co/datasets/danaroth/pavia",
     },
 
     "Salinas": {
         "desc": "Salinas Valley AVIRIS (16 classes, 512×217)",
-        "method": "direct",
+        "method": "huggingface",
+        "hf_repo": "danaroth/salinas",
         "files": [
-            {
-                "url": "https://www.ehu.eus/ccwintco/uploads/a/a3/Salinas_corrected.mat",
-                "dest": "Salinas_corrected.mat",
-            },
-            {
-                "url": "https://www.ehu.eus/ccwintco/uploads/f/fa/Salinas_gt.mat",
-                "dest": "Salinas_gt.mat",
-            },
+            "Salinas_corrected.mat",
+            "Salinas_gt.mat",
         ],
         "extract_dir": "Salinas",
-        "manual_url": "http://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes",
+        "manual_url": "https://huggingface.co/datasets/danaroth/salinas",
     },
 
     # ── HSI + SAR ─────────────────────────────────────────────────
 
     "Berlin": {
-        "desc": "Berlin EnMAP+Sentinel-1 (8 classes, 1723×476)",
-        "method": "gdrive",
-        "files": {
-            # Hong et al., ISPRS 2021 (S2FL paper)
-            "gdrive_id": "1EHRkknDVRBCiEFC4D0P4G4I4V_TbBBQw",
-            "zip_name":  "Berlin.zip",
-            "extract_dir": "Berlin",
-        },
-        "manual_url": "https://github.com/danfenghong/ISPRS_S2FL",
+        "desc": "Berlin EnMAP+Sentinel-1 SAR (8 classes, 476×1723)",
+        "method": "direct_zip",
+        "zip_url": (
+            "https://github.com/songyz2019/rs-fusion-datasets-dist/"
+            "releases/download/v1.0.0/berlin-ouc.zip"
+        ),
+        "zip_name": "berlin.zip",
+        "extract_dir": "Berlin",
+        "expected_files": ["berlin_hsi.mat", "berlin_sar.mat",
+                           "berlin_gt.mat", "berlin_index.mat"],
+        "manual_url": "https://github.com/songyz2019/rs-fusion-datasets-dist",
     },
 
     # ── UAV HSI ───────────────────────────────────────────────────
@@ -152,13 +158,17 @@ DATASET_SOURCES: dict[str, dict] = {
     "WHU-Hi-LongKou": {
         "desc": "WHU-Hi-LongKou UAV HSI (9 classes, 550×400)",
         "method": "huggingface",
-        "hf_repo": "WangHongbo/WHU-Hi",
+        "hf_repo": "danaroth/whu_hi",
         "files": [
+            "WHU-Hi-LongKou/WHU_Hi_LongKou.mat",
+            "WHU-Hi-LongKou/WHU_Hi_LongKou_gt.mat",
+        ],
+        "dest_names": [
             "WHU_Hi_LongKou.mat",
             "WHU_Hi_LongKou_gt.mat",
         ],
         "extract_dir": "WHU-Hi-LongKou",
-        "manual_url": "https://huggingface.co/datasets/WangHongbo/WHU-Hi",
+        "manual_url": "https://huggingface.co/datasets/danaroth/whu_hi",
     },
 }
 
@@ -239,46 +249,44 @@ def download_dataset(name: str, root: Path) -> bool:
             print(f"  Note: {src['note']}")
         return False
 
-    if method == "shared":
-        print(f"  [INFO] Included in another dataset's download (e.g., Trento/MDL-RS).")
-        print(f"  Manual URL: {src['manual_url']}")
-        return True
-
-    if method == "direct":
-        ok = True
-        for f in src["files"]:
-            dest = ds_dir / f["dest"]
-            if dest.exists():
-                print(f"  [SKIP] {f['dest']} already exists.")
-                continue
-            print(f"  Downloading {f['dest']} ...")
-            if not download_direct(f["url"], dest):
-                print(f"  [WARN] Failed: {f['url']}")
-                print(f"         Manual URL: {src.get('manual_url', 'N/A')}")
-                ok = False
-        return ok
-
-    if method == "gdrive":
-        files = src["files"]
-        zip_path = root / files["zip_name"]
-        if not zip_path.exists():
-            print(f"  Downloading {files['zip_name']} from Google Drive ...")
-            download_gdrive(files["gdrive_id"], zip_path)
-        else:
-            print(f"  [SKIP] {files['zip_name']} already downloaded.")
-        if zip_path.exists():
-            extract_zip(zip_path, root, subdir=files.get("extract_dir"))
+    if method == "direct_zip":
+        # Check if target files already exist
+        expected = src.get("expected_files", [])
+        if expected and all((ds_dir / f).exists() for f in expected):
+            print(f"  [SKIP] All expected files already exist.")
             return True
+        zip_path = root / src["zip_name"]
+        if not zip_path.exists():
+            print(f"  Downloading {src['zip_name']} ...")
+            if not download_direct(src["zip_url"], zip_path):
+                print(f"  [WARN] Download failed. Manual URL: {src.get('manual_url', 'N/A')}")
+                return False
         else:
-            print(f"  [WARN] Download failed. Manual URL: {src.get('manual_url', 'N/A')}")
-            return False
+            print(f"  [SKIP] {src['zip_name']} already downloaded.")
+        print(f"  Extracting to {ds_dir} ...")
+        # Extract flat into ds_dir (files may be in a subdirectory inside zip)
+        import shutil
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(ds_dir)
+        # Flatten one level if all files landed in a subdirectory
+        subdirs = [p for p in ds_dir.iterdir() if p.is_dir()]
+        if len(subdirs) == 1 and not any(ds_dir.glob("*.mat")):
+            subdir = subdirs[0]
+            for item in list(subdir.iterdir()):
+                shutil.move(str(item), str(ds_dir))
+            subdir.rmdir()
+        if "note" in src:
+            print(f"  Note: {src['note']}")
+        return True
 
     if method == "huggingface":
         ok = True
-        for fname in src["files"]:
-            dest = ds_dir / fname
+        fnames = src["files"]
+        dest_names = src.get("dest_names", fnames)
+        for fname, dname in zip(fnames, dest_names):
+            dest = ds_dir / Path(dname).name
             if dest.exists():
-                print(f"  [SKIP] {fname} already exists.")
+                print(f"  [SKIP] {dest.name} already exists.")
                 continue
             print(f"  Downloading {fname} from HuggingFace ...")
             if not download_huggingface(src["hf_repo"], fname, dest):

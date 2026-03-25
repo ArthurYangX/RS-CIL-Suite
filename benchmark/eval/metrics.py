@@ -36,13 +36,22 @@ class BenchmarkResult:
     task_results: List[TaskResult] = field(default_factory=list)
 
     # Derived (filled by compute_cl_metrics)
-    forgetting: Dict[str, float] = field(default_factory=dict)   # per dataset
-    bwt: float = 0.0
-    final_aa: float = 0.0
-    final_oa: float = 0.0
+    forgetting:  Dict[str, float] = field(default_factory=dict)   # per dataset
+    plasticity:  Dict[str, float] = field(default_factory=dict)   # per dataset, AA when first seen
+    bwt: float = 0.0    # backward transfer (mean forgetting, negative = bad)
+    fwt: float = 0.0    # forward transfer  (mean AA at first introduction)
+    final_aa:    float = 0.0
+    final_oa:    float = 0.0
     final_kappa: float = 0.0
 
+    # Internal: first-appearance AA per dataset (for plasticity/FWT)
+    _first_aa: Dict[str, float] = field(default_factory=dict, repr=False)
+
     def add(self, result: TaskResult):
+        # Record AA the first time each dataset appears (plasticity)
+        for ds, aa in result.per_dataset.items():
+            if ds not in self._first_aa:
+                self._first_aa[ds] = aa
         self.task_results.append(result)
 
     def compute_cl_metrics(self):
@@ -53,7 +62,7 @@ class BenchmarkResult:
         self.final_oa    = final.oa
         self.final_kappa = final.kappa
 
-        # Forgetting: for each dataset, find peak AA and subtract final AA
+        # Forgetting: peak AA → final AA per dataset
         self.forgetting = {}
         for ds in final.per_dataset:
             accs = [r.per_dataset.get(ds, 0.0) for r in self.task_results
@@ -64,6 +73,11 @@ class BenchmarkResult:
 
         self.bwt = float(np.mean(list(self.forgetting.values()))) if self.forgetting else 0.0
 
+        # Plasticity: AA at first introduction (FWT proxy — how well the model
+        # generalises to a new scene/class set without prior exposure)
+        self.plasticity = dict(self._first_aa)
+        self.fwt = float(np.mean(list(self.plasticity.values()))) if self.plasticity else 0.0
+
     def summary(self) -> str:
         lines = [
             f"\n{'='*60}",
@@ -72,10 +86,12 @@ class BenchmarkResult:
             f"  Final OA   : {self.final_oa*100:.2f}%",
             f"  Final AA   : {self.final_aa*100:.2f}%",
             f"  Final Kappa: {self.final_kappa:.4f}",
-            f"  BWT (Forgetting): {self.bwt*100:.2f}pp",
+            f"  BWT (Forgetting)  : {self.bwt*100:.2f}pp  (lower = less forgetting)",
+            f"  FWT (Plasticity)  : {self.fwt*100:.2f}%   (higher = faster adaptation)",
         ]
         for ds, f in self.forgetting.items():
-            lines.append(f"    [{ds}] forgetting = {f*100:.2f}pp")
+            pl = self.plasticity.get(ds, 0.0)
+            lines.append(f"    [{ds}] forgetting={f*100:.2f}pp  plasticity={pl*100:.2f}%")
         return "\n".join(lines)
 
 

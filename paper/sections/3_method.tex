@@ -1,0 +1,89 @@
+\section{Method}
+\label{sec:method}
+
+\subsection{Problem Formulation: Marathon CIL}
+\label{sec:protocol}
+
+We define the \emph{Marathon CIL} protocol for multimodal remote sensing. Given $D$ geographic domains $\{\mathcal{D}_1, \dots, \mathcal{D}_D\}$, each containing HSI+LiDAR paired data with non-overlapping class sets, the model processes a sequence of $T$ incremental tasks. Each task $t$ introduces new classes from one domain. The model must classify all seen classes without storing raw data from past tasks (exemplar-free).
+
+Concretely, we use three HSI+LiDAR benchmark datasets:
+\begin{itemize}
+    \item \textbf{Trento} (6 classes, 3 tasks of 2 classes each),
+    \item \textbf{Houston 2013} (15 classes, 3 tasks of 5 classes each),
+    \item \textbf{MUUFL Gulfport} (11 classes, 3 tasks of 4/4/3 classes).
+\end{itemize}
+The default ordering is Trento$\to$Houston$\to$MUUFL, yielding 9 tasks and 32 classes total. HSI bands are unified to 36 channels; LiDAR is padded to 2 channels across datasets.
+
+\subsection{Cross-Domain Feature Drift Analysis}
+\label{sec:drift}
+
+Before presenting our method, we quantify the cross-domain feature drift to motivate the asymmetric design. Using LSGA-ViT (HSI) and a standard CNN (LiDAR) pre-trained on Trento, we extract features from all three domains and compute pairwise drift metrics (cosine distance, MMD, Fisher discriminability).
+
+\paragraph{Finding 1: Spectral features drift less than spatial features.}
+In LSGA-ViT, shallow layers (spectral-dominant) exhibit cosine distance 0.82 across domains, increasing to 1.06 for deep layers (spatial-dominant)---a 29\% increase.
+
+\paragraph{Finding 2: LiDAR features drift the most.}
+LiDAR spatial features from the CNN show domain discriminability 2.5$\times$ higher than spectral features, reflecting the geographic specificity of elevation patterns.
+
+\paragraph{Finding 3: \backbonename{} branch-wise drift confirms the design.}
+On our \backbonename{} backbone (Table~\ref{tab:drift}), the three branches show average cosine drift ratios of 1.0$\times$ (spectral) : 2.3$\times$ (HSI-spatial) : 2.5$\times$ (LiDAR-spatial), directly justifying our asymmetric rank allocation of $r_{\text{LiDAR}} = 2 \times r_{\text{HSI}}$.
+
+\begin{table}[t]
+\centering
+\caption{Cross-domain feature drift of \backbonename{} branches (cosine distance, lower = more stable). Spectral features are consistently the most stable across all domain pairs.}
+\label{tab:drift}
+\begin{tabular}{lccc|c}
+\toprule
+Branch & T$\leftrightarrow$H & T$\leftrightarrow$M & H$\leftrightarrow$M & Avg \\
+\midrule
+Spectral & 0.53 & 0.08 & 0.31 & 0.31 \\
+HSI-Spatial & 0.97 & 0.68 & 0.49 & 0.71 \\
+LiDAR-Spatial & 0.84 & 0.89 & 0.58 & 0.77 \\
+\midrule
+Drift ratio & & & & 1:2.3:2.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{\backbonename{} Backbone}
+\label{sec:backbone}
+
+\backbonename{} (Spectral-Spatial Contrastive Mamba) extracts three complementary feature streams from HSI+LiDAR input:
+
+\begin{itemize}
+    \item \textbf{Spectral branch}: A 1D Mamba mixer processes per-pixel spectral vectors, capturing material absorption signatures. Output: $\fspec \in \R^{d}$.
+    \item \textbf{HSI-spatial branch}: 2D VSSBlocks (depthwise conv + MLP) extract spatial texture from HSI. Output: $\fhsi \in \R^{d}$.
+    \item \textbf{LiDAR-spatial branch}: The same VSSBlocks process LiDAR elevation maps in a Siamese configuration. Output: $\flid \in \R^{d}$.
+\end{itemize}
+
+An optional cross-fusion module exchanges information between HSI and LiDAR spatial streams. The three branches are concatenated for classification: $f = [\fspec; \fhsi; \flid] \in \R^{3d}$.
+
+\subsection{\methodname{}: Spectral-Anchored Low-Rank Adaptation}
+\label{sec:anchorlora}
+
+\paragraph{Phase 1: Warm-up (Tasks 0 to $W{-}1$).}
+During the first $W$ tasks (covering the initial domain), we fine-tune the entire \backbonename{} backbone with a differential learning rate: the spectral branch receives $0.1\times$ the base rate, encouraging spatial branches to adapt faster while the spectral branch stabilizes. After $W$ tasks, the spectral branch is frozen.
+
+\paragraph{Phase 2: Incremental LoRA (Tasks $W$ onward).}
+For each new task $t \geq W$:
+\begin{enumerate}
+    \item \textbf{Freeze backbone}: All backbone parameters are frozen.
+    \item \textbf{Add LoRA adapters}: For each VSSBlock in the spatial branches, a low-rank adapter is inserted:
+    \begin{equation}
+        h' = h + \alpha \cdot W_{\text{up}} \cdot W_{\text{down}} \cdot h
+    \end{equation}
+    where $W_{\text{down}} \in \R^{r \times d}$ and $W_{\text{up}} \in \R^{d \times r}$ are the LoRA matrices, $r$ is the rank, and $\alpha$ is a scaling factor.
+    \item \textbf{Asymmetric rank}: HSI-spatial LoRA uses rank $r$; LiDAR-spatial LoRA uses rank $2r$, reflecting the 2$\times$ higher drift of LiDAR features.
+    \item \textbf{Train}: Optimize LoRA parameters with cross-entropy loss on current-task data plus prototype consistency regularization for old classes.
+    \item \textbf{Freeze LoRA}: After training, the task's LoRA modules are frozen.
+\end{enumerate}
+
+\paragraph{Accumulated inference.}
+At test time, all frozen LoRA modules from past tasks are applied sequentially. No task identifier is needed---the model applies all accumulated adaptations to every input. This is simpler than routing-based approaches (which we found to degrade performance, see Section~\ref{sec:ablation}).
+
+\paragraph{Classification.}
+We use cosine nearest-class-mean (NCM) classification across all three branches, combined with SHINE domain normalization~\cite{shine2024} for cross-domain feature alignment:
+\begin{equation}
+    \hat{y} = \argmax_{c \in \mathcal{C}} \sum_{b \in \{\text{spec, hsi, lid}\}} \cosim(\hat{f}_b, \mu_c^b)
+\end{equation}
+where $\mu_c^b$ is the stored prototype for class $c$ in branch $b$, and $\hat{f}_b$ denotes the (optionally SHINE-normalized) features.

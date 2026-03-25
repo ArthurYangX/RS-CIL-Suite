@@ -97,24 +97,48 @@ class PODNet(CILMethod):
             if (ep + 1) % 10 == 0:
                 print(f"    [PODNet] Epoch {ep+1}/{self.epochs}  loss={total/n:.4f}")
 
+    def _herding_select(self, feats: torch.Tensor, k: int) -> torch.Tensor:
+        """Select k exemplars via herding (greedy class-mean approximation)."""
+        mean = feats.mean(0)
+        selected, current_sum = [], torch.zeros_like(mean)
+        remaining = list(range(len(feats)))
+        for _ in range(min(k, len(remaining))):
+            scores = [
+                ((mean - (current_sum + feats[i]) / (len(selected) + 1)) ** 2).sum().item()
+                for i in remaining
+            ]
+            best = remaining[int(np.argmin(scores))]
+            selected.append(best)
+            current_sum += feats[best]
+            remaining.remove(best)
+        return torch.tensor(selected)
+
     def after_task(self, task: Task, train_loader: DataLoader):
         k_per_class = max(1, self.memory_size // len(self.seen_classes))
+        # Trim existing exemplars to new budget
         for c in list(self._exemplars):
             h, l, y = self._exemplars[c]
             self._exemplars[c] = (h[:k_per_class], l[:k_per_class], y[:k_per_class])
-
+        # Collect all patches for new task classes, then apply herding
         self.model.eval()
+        class_patches: dict[int, tuple] = {}
         with torch.no_grad():
             for xh, xl, y in train_loader:
                 for c in task.global_class_ids:
                     mask = y == c
-                    if mask.sum() > 0 and c not in self._exemplars:
-                        n_take = min(mask.sum().item(), k_per_class)
-                        self._exemplars[c] = (
-                            xh[mask][:n_take],
-                            xl[mask][:n_take],
-                            y[mask][:n_take],
-                        )
+                    if mask.sum() == 0 or c in self._exemplars:
+                        continue
+                    xh_c, xl_c, y_c = xh[mask], xl[mask], y[mask]
+                    if c not in class_patches:
+                        class_patches[c] = ([], [], [])
+                    class_patches[c][0].append(xh_c)
+                    class_patches[c][1].append(xl_c)
+                    class_patches[c][2].append(y_c)
+            for c, (hs, ls, ys) in class_patches.items():
+                xh_c = torch.cat(hs); xl_c = torch.cat(ls); y_c = torch.cat(ys)
+                feats = self.model(xh_c.to(self.device), xl_c.to(self.device)).cpu()
+                idx = self._herding_select(feats, k_per_class)
+                self._exemplars[c] = (xh_c[idx], xl_c[idx], y_c[idx])
 
     @torch.no_grad()
     def predict(self, loader):
