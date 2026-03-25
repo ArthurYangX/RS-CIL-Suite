@@ -48,6 +48,19 @@ class PatchDataset(Dataset):
     def __getitem__(self, idx: int):
         return self.hsi[idx], self.lidar[idx], self.labels[idx]
 
+    def pad_lidar(self, target_channels: int) -> "PatchDataset":
+        """Zero-pad lidar channels to target_channels (no-op if already ≥)."""
+        c = self.lidar.shape[1]
+        if c >= target_channels:
+            return self
+        pad = torch.zeros(len(self.labels), target_channels - c,
+                          self.lidar.shape[2], self.lidar.shape[3])
+        new = PatchDataset.__new__(PatchDataset)
+        new.hsi    = self.hsi
+        new.lidar  = torch.cat([self.lidar, pad], dim=1)
+        new.labels = self.labels
+        return new
+
     def subset(self, class_ids: List[int]) -> "PatchDataset":
         """Return a new PatchDataset containing only the given classes."""
         mask = torch.zeros(len(self.labels), dtype=torch.bool)

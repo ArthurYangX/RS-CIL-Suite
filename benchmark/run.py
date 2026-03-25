@@ -62,6 +62,14 @@ def run(args):
               f"train={len(datasets[ds_name].train)} "
               f"test={len(datasets[ds_name].test)}")
 
+    # Unify LiDAR channel count across all datasets (pad to maximum)
+    lid_ch_max = max(ds.train.lidar.shape[1] for ds in datasets.values())
+    if lid_ch_max > 1:
+        for ds_name, ds in datasets.items():
+            if ds.train.lidar.shape[1] < lid_ch_max:
+                ds._train = ds.train.pad_lidar(lid_ch_max)
+                ds._test  = ds.test.pad_lidar(lid_ch_max)
+
     # ── Build class-to-dataset mapping ────────────────────────────
     class_to_dataset = build_class_to_dataset(protocol)
 
@@ -183,9 +191,15 @@ def _remap_labels(ds, local_ids: list[int], global_ids: list[int]):
 # ── Method factory (stub, will grow) ─────────────────────────────
 
 def _build_method(name: str, protocol: CILProtocol, device, datasets):
-    total   = protocol.total_classes
-    hsi_ch  = 36   # after PCA
-    lid_ch  = 2    # unified (zero-padded to 2 channels)
+    total  = protocol.total_classes
+    hsi_ch = 36   # always 36 after PCA
+
+    # Determine LiDAR channel count from actual data
+    # (different datasets may have 1, 2, or 4 channels)
+    lid_ch = max(
+        ds.train.lidar.shape[1]
+        for ds in datasets.values()
+    )
 
     kwargs = dict(hsi_channels=hsi_ch, lidar_channels=lid_ch,
                   num_classes=total, device=device)
@@ -230,7 +244,53 @@ if __name__ == "__main__":
     p.add_argument("--pca_components",type=int,   default=36)
     p.add_argument("--batch_size",    type=int,   default=256)
     p.add_argument("--seed",          type=int,   default=0)
+    p.add_argument("--seeds",         type=str,   default=None,
+                   help="Comma-separated seeds for multi-seed averaging, e.g. '0,1,2'")
     p.add_argument("--output",        default=None,
                    help="Path to save JSON results")
     args = p.parse_args()
-    run(args)
+
+    if args.seeds:
+        # Multi-seed mode: run once per seed and average final metrics
+        seeds = [int(s.strip()) for s in args.seeds.split(",")]
+        all_results = []
+        for seed in seeds:
+            print(f"\n{'#'*60}")
+            print(f"# Seed {seed}")
+            print(f"{'#'*60}")
+            args.seed = seed
+            orig_output = args.output
+            if orig_output:
+                p2 = Path(orig_output)
+                args.output = str(p2.parent / f"{p2.stem}_seed{seed}{p2.suffix}")
+            all_results.append(run(args))
+            args.output = orig_output
+        # Print averaged summary
+        import statistics
+        oa  = statistics.mean(r.final_oa    for r in all_results)
+        aa  = statistics.mean(r.final_aa    for r in all_results)
+        kap = statistics.mean(r.final_kappa for r in all_results)
+        bwt = statistics.mean(r.bwt         for r in all_results)
+        fwt = statistics.mean(r.fwt         for r in all_results)
+        oa_std  = statistics.stdev(r.final_oa    for r in all_results) if len(seeds) > 1 else 0
+        aa_std  = statistics.stdev(r.final_aa    for r in all_results) if len(seeds) > 1 else 0
+        print(f"\n{'='*60}")
+        print(f"Multi-seed average  ({len(seeds)} seeds: {seeds})")
+        print(f"  OA:  {oa*100:.2f} ± {oa_std*100:.2f}%")
+        print(f"  AA:  {aa*100:.2f} ± {aa_std*100:.2f}%")
+        print(f"  κ:   {kap:.4f}")
+        print(f"  BWT: {bwt*100:.2f}pp")
+        print(f"  FWT: {fwt*100:.2f}%")
+        if args.output:
+            out = Path(args.output)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            with open(out, "w") as f:
+                json.dump({
+                    "protocol": args.protocol, "method": args.method,
+                    "seeds": seeds,
+                    "oa_mean": oa, "oa_std": oa_std,
+                    "aa_mean": aa, "aa_std": aa_std,
+                    "kappa_mean": kap, "bwt_mean": bwt, "fwt_mean": fwt,
+                }, f, indent=2)
+    else:
+        run(args)
