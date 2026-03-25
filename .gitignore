@@ -82,6 +82,7 @@ docs/
 paper/
 *.md
 !CLAUDE.md
+!benchmark/README.md
 *.key
 *.json
 *.bib
