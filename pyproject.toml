@@ -1,0 +1,58 @@
+[project]
+name = "rs-cil-benchmark"
+version = "0.1.0"
+description = "Class-Incremental Learning benchmark for Remote Sensing hyperspectral imagery"
+requires-python = ">=3.9"
+
+dependencies = [
+    # ── Core ML ───────────────────────────────────────────────────
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-learn>=1.2",
+
+    # ── HSI preprocessing ─────────────────────────────────────────
+    "spectral>=0.23",          # ENVI .bsq/.hdr reader (WHU-Hi-LongKou)
+
+    # ── Experiment tracking ───────────────────────────────────────
+    "wandb>=0.16",
+
+    # ── Plotting & visualization ──────────────────────────────────
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+    "pandas>=2.0",
+
+    # ── Download utilities ────────────────────────────────────────
+    "gdown>=4.7",              # Google Drive fallback downloads
+    "requests>=2.31",
+
+    # ── Progress & logging ────────────────────────────────────────
+    "tqdm>=4.65",
+    "rich>=13.0",              # pretty console output
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ipykernel",
+    "jupyter",
+]
+
+[project.scripts]
+rs-cil-download   = "benchmark.download:main"
+rs-cil-run        = "benchmark.run:main_cli"
+rs-cil-compare    = "benchmark.compare:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["benchmark"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0",
+    "ipykernel",
+]

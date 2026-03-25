@@ -1,0 +1,29 @@
+# RS-CIL Benchmark — pip requirements
+# Install: pip install -r requirements.txt
+# With uv:  uv pip install -r requirements.txt
+
+# ── Core ML ───────────────────────────────────────────────────────
+torch>=2.0
+torchvision>=0.15
+numpy>=1.24
+scipy>=1.10
+scikit-learn>=1.2
+
+# ── HSI preprocessing ─────────────────────────────────────────────
+spectral>=0.23          # ENVI .bsq/.hdr reader (WHU-Hi-LongKou)
+
+# ── Experiment tracking ───────────────────────────────────────────
+wandb>=0.16
+
+# ── Plotting & visualization ──────────────────────────────────────
+matplotlib>=3.7
+seaborn>=0.12
+pandas>=2.0
+
+# ── Download utilities ────────────────────────────────────────────
+gdown>=4.7              # Google Drive fallback downloads
+requests>=2.31
+
+# ── Progress & logging ────────────────────────────────────────────
+tqdm>=4.65
+rich>=13.0

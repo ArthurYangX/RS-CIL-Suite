@@ -4,8 +4,17 @@ Usage:
     python benchmark/run.py --protocol B1 --method finetune \
         --data_root ~/data/rs_cil --seed 0
 
-    python benchmark/run.py --protocol A_Houston2013 --method ncm \
-        --data_root ~/data/rs_cil
+    # With wandb logging
+    python benchmark/run.py --protocol A_Houston2013 --method icarl \
+        --data_root ~/data/rs_cil --wandb --wandb_project rs-cil
+
+    # Multi-seed
+    python benchmark/run.py --protocol B1 --method ncm --seeds 0,1,2 \
+        --data_root ~/data/rs_cil --output results/ncm_B1.json
+
+    # Generate figures after run
+    python benchmark/run.py --protocol B1 --method icarl \
+        --data_root ~/data/rs_cil --output results/icarl_B1.json --plot
 """
 from __future__ import annotations
 import argparse, json, random, sys
@@ -38,10 +47,64 @@ def build_class_to_dataset(protocol: CILProtocol) -> dict[int, str]:
     return mapping
 
 
+def _init_wandb(args):
+    """Initialise wandb run if --wandb is set. Returns run or None."""
+    if not getattr(args, "wandb", False):
+        return None
+    try:
+        import wandb
+        run = wandb.init(
+            project=getattr(args, "wandb_project", "rs-cil-benchmark"),
+            name=f"{args.method}_{args.protocol}_seed{args.seed}",
+            config={
+                "protocol":       args.protocol,
+                "method":         args.method,
+                "seed":           args.seed,
+                "patch_size":     args.patch_size,
+                "pca_components": args.pca_components,
+                "batch_size":     args.batch_size,
+            },
+            reinit=True,
+        )
+        return run
+    except ImportError:
+        print("[WARN] wandb not installed. Run: pip install wandb")
+        return None
+
+
+def _wandb_log_task(wandb_run, task_id: int, task_result):
+    if wandb_run is None:
+        return
+    import wandb
+    wandb_run.log({
+        "task":       task_id,
+        "oa":         task_result.oa * 100,
+        "aa":         task_result.avg_aa * 100,
+        "kappa":      task_result.kappa,
+    }, step=task_id)
+
+
+def _wandb_log_final(wandb_run, result):
+    if wandb_run is None:
+        return
+    import wandb
+    wandb_run.summary.update({
+        "final_oa":    result.final_oa * 100,
+        "final_aa":    result.final_aa * 100,
+        "final_kappa": result.final_kappa,
+        "bwt":         result.bwt * 100,
+        "fwt":         result.fwt * 100,
+        "forgetting":  result.forgetting * 100,
+        "plasticity":  result.plasticity * 100,
+    })
+    wandb_run.finish()
+
+
 def run(args):
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
+    wandb_run = _init_wandb(args)
 
     # ── Protocol ──────────────────────────────────────────────────
     if args.protocol not in PROTOCOLS:
@@ -139,9 +202,11 @@ def run(args):
                   f"AA={task_result.avg_aa*100:.2f}%  "
                   f"κ={task_result.kappa:.4f}")
             print(f"  {ds_str}")
+            _wandb_log_task(wandb_run, task.task_id, task_result)
 
     result.compute_cl_metrics()
     print(result.summary())
+    _wandb_log_final(wandb_run, result)
 
     # ── Save ──────────────────────────────────────────────────────
     if args.output:
@@ -167,6 +232,17 @@ def run(args):
         with open(out, "w") as f:
             json.dump(data, f, indent=2)
         print(f"\nResults saved → {out}")
+
+    # ── Plot ──────────────────────────────────────────────────────
+    if getattr(args, "plot", False):
+        try:
+            from benchmark.eval.plots import plot_task_curves, plot_forgetting_matrix
+            stem = Path(args.output).stem if args.output else f"{args.method}_{args.protocol}_seed{args.seed}"
+            fig_dir = Path(args.output).parent / "figs" if args.output else Path("figs")
+            plot_task_curves(result, save=str(fig_dir / f"{stem}_curves.pdf"))
+            plot_forgetting_matrix(result, save=str(fig_dir / f"{stem}_forgetting.pdf"))
+        except ImportError as e:
+            print(f"[WARN] Plotting skipped: {e}")
 
     return result
 
@@ -249,6 +325,12 @@ if __name__ == "__main__":
                    help="Comma-separated seeds for multi-seed averaging, e.g. '0,1,2'")
     p.add_argument("--output",        default=None,
                    help="Path to save JSON results")
+    p.add_argument("--wandb",         action="store_true",
+                   help="Enable Weights & Biases logging")
+    p.add_argument("--wandb_project", default="rs-cil-benchmark",
+                   help="W&B project name (default: rs-cil-benchmark)")
+    p.add_argument("--plot",          action="store_true",
+                   help="Generate figures after run (requires matplotlib/seaborn)")
     args = p.parse_args()
 
     if args.seeds:
