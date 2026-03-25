@@ -14,16 +14,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("icarl")
 class iCaRL(CILMethod):
     name = "iCaRL"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs=50, lr=1e-3, memory_size=2000, T=2.0):
+                 d=128, epochs=50, lr=1e-3, memory_size=2000, T=2.0, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d
@@ -188,3 +189,18 @@ class iCaRL(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        state = {
+            "head": self.head.state_dict(),
+            "_exemplars": {c: (h.cpu(), l.cpu(), y.cpu())
+                           for c, (h, l, y) in self._exemplars.items()},
+            "_class_means": {c: v.cpu() for c, v in self._class_means.items()},
+        }
+        return state
+
+    def _load_method_state(self, ckpt: dict):
+        self.head.load_state_dict(ckpt["head"])
+        self._exemplars = ckpt["_exemplars"]
+        self._class_means = ckpt["_class_means"]

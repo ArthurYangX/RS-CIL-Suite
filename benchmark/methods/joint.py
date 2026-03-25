@@ -11,16 +11,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, ConcatDataset
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("joint")
 class JointTraining(CILMethod):
     name = "Joint"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs=50, lr=1e-3):
+                 d=128, epochs=50, lr=1e-3, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d
@@ -67,3 +68,10 @@ class JointTraining(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        return {"head": self.head.state_dict()}
+
+    def _load_method_state(self, ckpt: dict):
+        self.head.load_state_dict(ckpt["head"])

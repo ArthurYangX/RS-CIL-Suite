@@ -11,16 +11,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("lwf")
 class LwF(CILMethod):
     name = "LwF"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs=50, lr=1e-3, T=2.0, lwf_lambda=1.0):
+                 d=128, epochs=50, lr=1e-3, T=2.0, lwf_lambda=1.0, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d
@@ -91,3 +92,20 @@ class LwF(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        state = {"head": self.head.state_dict()}
+        if self._old_model is not None:
+            state["_old_model"] = self._old_model.state_dict()
+        return state
+
+    def _load_method_state(self, ckpt: dict):
+        self.head.load_state_dict(ckpt["head"])
+        if "_old_model" in ckpt:
+            from copy import deepcopy
+            self._old_model = deepcopy(self.model)
+            self._old_model.load_state_dict(ckpt["_old_model"])
+            self._old_model.eval()
+            for p in self._old_model.parameters():
+                p.requires_grad_(False)

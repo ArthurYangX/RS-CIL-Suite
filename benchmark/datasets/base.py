@@ -77,8 +77,11 @@ class PatchDataset(Dataset):
 class RSDataset(ABC):
     """Abstract base class for all RS-CIL datasets.
 
-    Subclasses must implement `load()` which returns
-    (train_dataset, test_dataset, info).
+    Subclasses must implement `_preprocess()` which returns
+    (train_hsi, train_lidar, train_labels, test_hsi, test_lidar, test_labels).
+
+    Optionally override `_load_gt_map()` to provide the spatial ground-truth
+    label map (H, W) for classification map visualisation.
     """
 
     INFO: DatasetInfo  # class-level metadata
@@ -89,6 +92,7 @@ class RSDataset(ABC):
         self.pca_components = pca_components
         self._train: Optional[PatchDataset] = None
         self._test:  Optional[PatchDataset] = None
+        self._gt_map: Optional[np.ndarray] = None
 
     # ── Public API ────────────────────────────────────────────────
 
@@ -115,6 +119,27 @@ class RSDataset(ABC):
     @property
     def class_names(self) -> List[str]:
         return self.INFO.class_names
+
+    @property
+    def gt_map(self) -> np.ndarray:
+        """(H, W) ground truth label map, 1-indexed (0 = background).
+
+        Lazily loaded and cached. Used for classification map visualisation.
+        """
+        if self._gt_map is None:
+            self._gt_map = self._load_gt_map()
+        return self._gt_map
+
+    def _load_gt_map(self) -> np.ndarray:
+        """Override to load the spatial ground-truth label map.
+
+        Returns:
+            (H, W) int32 array. Values 1..num_classes, 0 = background.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not implement _load_gt_map(). "
+            "Override it to enable classification map visualisation."
+        )
 
     # ── Internal ──────────────────────────────────────────────────
 

@@ -19,7 +19,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
@@ -35,12 +35,13 @@ class _BiasLayer(nn.Module):
         return self.alpha * x + self.beta
 
 
+@register_method("bic")
 class BiC(CILMethod):
     name = "BiC"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
                  d=128, epochs=50, lr=1e-3, memory_size=2000, T=2.0,
-                 bias_epochs=200, bias_lr=1e-3, val_ratio=0.1):
+                 bias_epochs=200, bias_lr=1e-3, val_ratio=0.1, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d
@@ -226,3 +227,23 @@ class BiC(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        return {
+            "head": self.head.state_dict(),
+            "_exemplars": {c: (h.cpu(), l.cpu(), y.cpu())
+                           for c, (h, l, y) in self._exemplars.items()},
+            "_bias_layers": [bl.state_dict() for bl in self._bias_layers],
+            "_task_class_ranges": self._task_class_ranges,
+        }
+
+    def _load_method_state(self, ckpt: dict):
+        self.head.load_state_dict(ckpt["head"])
+        self._exemplars = ckpt["_exemplars"]
+        self._bias_layers = []
+        for sd in ckpt["_bias_layers"]:
+            bl = _BiasLayer().to(self.device)
+            bl.load_state_dict(sd)
+            self._bias_layers.append(bl)
+        self._task_class_ranges = ckpt["_task_class_ranges"]

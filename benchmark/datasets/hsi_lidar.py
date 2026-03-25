@@ -34,13 +34,13 @@ class Trento(RSDataset):
         lidar_channels=1,
     )
 
+    def _load_gt_map(self):
+        return loadmat(self.root / "allgrd.mat")["mask_test"].astype(np.int32)
+
     def _preprocess(self):
-        # tyust-dayu/Trento format: Italy_hsi.mat, Italy_lidar.mat, allgrd.mat
         hsi   = loadmat(self.root / "Italy_hsi.mat")["data"].astype(np.float32)
         lidar = loadmat(self.root / "Italy_lidar.mat")["data"].astype(np.float32)
-        gt    = loadmat(self.root / "allgrd.mat")["mask_test"].astype(np.int32)
-        # allgrd.mat contains the full (train+test) labelled map; use fixed split
-        # provided by the community: split ~10% for training
+        gt    = self.gt_map
         from .hsi_only import _stratified_split
         tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
         return preprocess_hsi_lidar(hsi, lidar, tr, te,
@@ -69,6 +69,11 @@ class Houston2013(RSDataset):
         hsi_bands=144,
         lidar_channels=1,
     )
+
+    def _load_gt_map(self):
+        tr = loadmat(self.root / "TRLabel.mat")["TRLabel"].astype(np.int32)
+        te = loadmat(self.root / "TSLabel.mat")["TSLabel"].astype(np.int32)
+        return np.maximum(tr, te)  # merge train + test maps
 
     def _preprocess(self):
         hsi   = loadmat(self.root / "HSI.mat")["HSI"].astype(np.float32)
@@ -101,18 +106,20 @@ class MUUFL(RSDataset):
         lidar_channels=2,
     )
 
+    def _load_gt_map(self):
+        mat = loadmat(self.root / "muufl_gulfport_campus_1_hsi_220_label.mat",
+                      squeeze_me=True, struct_as_record=False)
+        return np.array(mat["hsi"].sceneLabels.labels, dtype=np.int32)
+
     def _preprocess(self):
-        # GatorSense format: one nested struct file
-        # muufl_gulfport_campus_1_hsi_220_label.mat, key='hsi'
-        # hsi.Data (325×220×64), hsi.Lidar[0].z, hsi.sceneLabels.labels
         mat = loadmat(self.root / "muufl_gulfport_campus_1_hsi_220_label.mat",
                       squeeze_me=True, struct_as_record=False)
         s = mat["hsi"]
-        hsi_cube = np.array(s.Data, dtype=np.float32)         # (325, 220, 64)
-        lidar_ch = np.array(s.Lidar[0].z, dtype=np.float32)   # (325, 220) first return
+        hsi_cube = np.array(s.Data, dtype=np.float32)
+        lidar_ch = np.array(s.Lidar[0].z, dtype=np.float32)
         if lidar_ch.ndim == 2:
             lidar_ch = lidar_ch[:, :, np.newaxis]
-        gt = np.array(s.sceneLabels.labels, dtype=np.int32)    # (325, 220), 1-indexed
+        gt = np.array(s.sceneLabels.labels, dtype=np.int32)
         from .hsi_only import _stratified_split
         tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
         return preprocess_hsi_lidar(hsi_cube, lidar_ch, tr, te,
@@ -140,17 +147,15 @@ class Augsburg(RSDataset):
         lidar_channels=4,   # SAR+DSM combined channels
     )
 
+    def _load_gt_map(self):
+        return loadmat(self.root / "augsburg_gt.mat")["augsburg_gt"].astype(np.int32)
+
     def _preprocess(self):
-        # rs-fusion-datasets-dist (OUC) format:
-        # augsburg_hsi.mat  key: augsburg_hsi
-        # augsburg_sar.mat  key: augsburg_sar
-        # augsburg_gt.mat   key: augsburg_gt  (H×W label map, 1-indexed)
-        # augsburg_index.mat keys: augsburg_train, augsburg_test (linear pixel indices, 1-indexed)
         hsi = loadmat(self.root / "augsburg_hsi.mat")["augsburg_hsi"].astype(np.float32)
         sar = loadmat(self.root / "augsburg_sar.mat")["augsburg_sar"].astype(np.float32)
-        gt  = loadmat(self.root / "augsburg_gt.mat")["augsburg_gt"].astype(np.int32)
+        gt  = self.gt_map
         idx = loadmat(self.root / "augsburg_index.mat")
-        tr_linear = idx["augsburg_train"].ravel().astype(np.int64) - 1  # MATLAB→0-indexed
+        tr_linear = idx["augsburg_train"].ravel().astype(np.int64) - 1
         te_linear = idx["augsburg_test"].ravel().astype(np.int64) - 1
         tr, te = linear_index_to_label_maps(gt, tr_linear, te_linear)
         return preprocess_hsi_lidar(hsi, sar, tr, te,
@@ -182,15 +187,13 @@ class Houston2018(RSDataset):
         lidar_channels=1,
     )
 
+    def _load_gt_map(self):
+        return loadmat(self.root / "houston_gt.mat")["houston_gt"].astype(np.int32)
+
     def _preprocess(self):
-        # rs-fusion-datasets-dist (OUC) format:
-        # houston_hsi.mat   key: houston_hsi
-        # houston_lidar.mat key: houston_lidar
-        # houston_gt.mat    key: houston_gt  (H×W label map, 1-indexed)
-        # houston_index.mat keys: houston_train, houston_test (linear pixel indices, 1-indexed)
         hsi   = loadmat(self.root / "houston_hsi.mat")["houston_hsi"].astype(np.float32)
         lidar = loadmat(self.root / "houston_lidar.mat")["houston_lidar"].astype(np.float32)
-        gt    = loadmat(self.root / "houston_gt.mat")["houston_gt"].astype(np.int32)
+        gt    = self.gt_map
         idx   = loadmat(self.root / "houston_index.mat")
         tr_linear = idx["houston_train"].ravel().astype(np.int64) - 1
         te_linear = idx["houston_test"].ravel().astype(np.int64) - 1

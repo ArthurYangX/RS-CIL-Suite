@@ -1,0 +1,5 @@
+# WA — Weight Aligning (Zhao et al., CVPR 2020)
+method:
+  memory_size: 2000
+  T: 2.0
+  exemplar_strategy: herding    # herding | random | k_center

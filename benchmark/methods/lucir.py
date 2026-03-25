@@ -15,18 +15,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("lucir")
 class LUCIR(CILMethod):
     name = "LUCIR"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
                  d=128, epochs=50, lr=1e-3,
                  memory_size=2000, lf_lambda=5.0, mr_lambda=1.0,
-                 K=2, margin=0.5):
+                 K=2, margin=0.5, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d
@@ -170,3 +171,19 @@ class LUCIR(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        return {
+            "cls_weights": self.cls_weights.data.cpu(),
+            "scale": self.scale.data.cpu(),
+            "_old_classes": self._old_classes,
+            "_exemplars": {c: (h.cpu(), l.cpu(), y.cpu())
+                           for c, (h, l, y) in self._exemplars.items()},
+        }
+
+    def _load_method_state(self, ckpt: dict):
+        self.cls_weights.data.copy_(ckpt["cls_weights"])
+        self.scale.data.copy_(ckpt["scale"])
+        self._old_classes = ckpt["_old_classes"]
+        self._exemplars = ckpt["_exemplars"]

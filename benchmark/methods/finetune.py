@@ -10,18 +10,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("finetune")
 class FineTune(CILMethod):
 
     name = "FineTune"
 
     def __init__(self, hsi_channels: int, lidar_channels: int,
                  num_classes: int, device: torch.device, d: int = 128,
-                 epochs: int = 50, lr: float = 1e-3):
+                 epochs: int = 50, lr: float = 1e-3, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d
@@ -61,6 +62,13 @@ class FineTune(CILMethod):
             preds = torch.tensor([cids[i] for i in pred_idx.cpu().tolist()])
             all_preds.append(preds); all_targets.append(y)
         return torch.cat(all_preds).numpy(), torch.cat(all_targets).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        return {"head": self.head.state_dict()}
+
+    def _load_method_state(self, ckpt: dict):
+        self.head.load_state_dict(ckpt["head"])
 
     @staticmethod
     def _remap(y: torch.Tensor, seen: list[int]) -> torch.Tensor:

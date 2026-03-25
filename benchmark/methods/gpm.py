@@ -17,11 +17,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("gpm")
 class GPM(CILMethod):
     name = "GPM"
 
@@ -30,7 +31,7 @@ class GPM(CILMethod):
                  epochs: int = 50,
                  lr: float = 1e-3,
                  threshold: float = 0.97,
-                 eps: float = 0.1):
+                 eps: float = 0.1, **kwargs):
         """
         Args:
             d:          Feature embedding dimension.
@@ -176,3 +177,14 @@ class GPM(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        return {
+            "head": self.head.state_dict(),
+            "_memory": {n: t.cpu() for n, t in self._memory.items()},
+        }
+
+    def _load_method_state(self, ckpt: dict):
+        self.head.load_state_dict(ckpt["head"])
+        self._memory = ckpt["_memory"]

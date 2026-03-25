@@ -1,0 +1,5 @@
+# PODNet — Pooled Outputs Distillation Network
+method:
+  memory_size: 2000
+  pod_lambda: 1.0
+  T: 2.0

@@ -1,0 +1,4 @@
+# LwF — Learning without Forgetting
+method:
+  T: 2.0
+  lwf_lambda: 1.0

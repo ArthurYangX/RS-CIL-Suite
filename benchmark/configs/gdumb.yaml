@@ -1,0 +1,4 @@
+# GDumb — Greedy Sampler and Dumb Learner
+method:
+  memory_size: 2000
+  epochs_final: 100

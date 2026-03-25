@@ -1,0 +1,20 @@
+# Example: Custom cross-scene protocol
+# Usage: python benchmark/run.py --protocol configs/protocols/example_cross_scene.yaml
+
+name: Custom_3Dataset
+type: cross_scene
+
+dataset_order:
+  - Trento
+  - Houston2013
+  - MUUFL
+
+class_splits:
+  Trento: [3, 3]              # 2 tasks, 3 classes each
+  Houston2013: [5, 5, 5]      # 3 tasks, 5 classes each
+  MUUFL: [6, 5]               # 2 tasks
+
+# Optional settings:
+# train_ratio: 0.15           # Override default 10% train split
+# shuffle_classes: true        # Randomize class order within each dataset
+# class_order_seed: 42         # Seed for reproducible shuffling

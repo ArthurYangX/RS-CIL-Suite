@@ -1,0 +1,4 @@
+# iCaRL — Incremental Classifier and Representation Learning
+method:
+  memory_size: 2000
+  T: 2.0

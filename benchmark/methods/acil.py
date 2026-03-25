@@ -14,16 +14,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("acil")
 class ACIL(CILMethod):
     name = "ACIL"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs_base=50, lr=1e-3, ridge=1.0):
+                 d=128, epochs_base=50, lr=1e-3, ridge=1.0, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d
@@ -119,3 +120,21 @@ class ACIL(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        state = {}
+        if self._R is not None:
+            state["_R"] = self._R.cpu()
+        if self._FtY is not None:
+            state["_FtY"] = self._FtY.cpu()
+        if self._W is not None:
+            state["_W"] = self._W.cpu()
+        state["_frozen"] = self._frozen
+        return state
+
+    def _load_method_state(self, ckpt: dict):
+        self._R = ckpt.get("_R")
+        self._FtY = ckpt.get("_FtY")
+        self._W = ckpt.get("_W")
+        self._frozen = ckpt.get("_frozen", False)

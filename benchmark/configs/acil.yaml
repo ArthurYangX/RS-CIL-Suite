@@ -1,0 +1,4 @@
+# ACIL — Analytic Class-Incremental Learning
+method:
+  epochs_base: 50
+  ridge: 1.0

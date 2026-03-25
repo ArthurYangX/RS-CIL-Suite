@@ -1,0 +1,15 @@
+# Example: Custom within-scene protocol
+# Usage: python benchmark/run.py --protocol configs/protocols/example_within_scene.yaml
+
+name: IndianPines_FineGrained
+type: within_scene
+
+dataset_order:
+  - IndianPines
+
+class_splits:
+  IndianPines: [2, 2, 2, 2, 2, 2, 2, 2]   # 8 tasks, 2 classes each
+
+# Shuffle class order with a fixed seed for reproducibility study
+shuffle_classes: true
+class_order_seed: 123

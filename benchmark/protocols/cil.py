@@ -218,3 +218,101 @@ PROTOCOLS = {
     "A_Berlin":         PROTOCOL_A_BERLIN,
     "A_WHUHiLongKou":   PROTOCOL_A_WHUHILONGKOU,
 }
+
+
+# ══════════════════════════════════════════════════════════════════
+# YAML-based custom protocol loader
+# ══════════════════════════════════════════════════════════════════
+
+def load_protocol_yaml(path: str) -> CILProtocol:
+    """Load a custom protocol from a YAML file.
+
+    YAML format::
+
+        name: MyProtocol
+        type: cross_scene           # or "within_scene"
+        dataset_order: [Trento, Houston2013, MUUFL]
+        class_splits:
+          Trento: [2, 2, 2]
+          Houston2013: [5, 5, 5]
+          MUUFL: [4, 4, 3]
+
+        # Optional:
+        train_ratio: 0.15           # override default 10% (stored, applied by runner)
+        shuffle_classes: false       # if true, permute class order within each dataset
+        class_order_seed: 42        # seed for class permutation
+    """
+    try:
+        import yaml
+    except ImportError:
+        raise ImportError("PyYAML required: pip install pyyaml")
+
+    from pathlib import Path
+    with open(Path(path)) as f:
+        cfg = yaml.safe_load(f)
+
+    name = cfg.get("name", Path(path).stem)
+    proto_type = cfg.get("type", "cross_scene")
+    dataset_order = cfg["dataset_order"]
+    class_splits = cfg["class_splits"]
+    shuffle = cfg.get("shuffle_classes", False)
+    seed = cfg.get("class_order_seed", 42)
+
+    # Optionally shuffle class ordering within each dataset
+    if shuffle:
+        import random
+        rng = random.Random(seed)
+        for ds in dataset_order:
+            nc = NUM_CLASSES[ds]
+            perm = list(range(nc))
+            rng.shuffle(perm)
+            # Remap class splits to use permuted order
+            # Store permutation as metadata
+            cfg.setdefault("_class_permutations", {})[ds] = perm
+
+    if proto_type == "within_scene":
+        assert len(dataset_order) == 1, "within_scene requires exactly 1 dataset"
+        ds = dataset_order[0]
+        splits = class_splits[ds] if isinstance(class_splits, dict) else class_splits
+        protocol = build_within_scene(ds, splits, NUM_CLASSES[ds])
+    else:
+        protocol = build_cross_scene(dataset_order, class_splits, NUM_CLASSES)
+
+    protocol.name = name
+
+    # Attach optional metadata for the runner
+    protocol.train_ratio = cfg.get("train_ratio", None)
+    protocol.class_order_seed = seed
+    protocol.shuffle_classes = shuffle
+
+    return protocol
+
+
+def get_protocol(name_or_path: str) -> CILProtocol:
+    """Get a protocol by registry name or YAML file path.
+
+    Args:
+        name_or_path: Either a key in PROTOCOLS (e.g. "B1") or a path
+                      to a custom YAML protocol file.
+
+    Returns:
+        CILProtocol instance.
+    """
+    if name_or_path in PROTOCOLS:
+        return PROTOCOLS[name_or_path]
+
+    from pathlib import Path
+    p = Path(name_or_path)
+    if p.exists() and p.suffix in (".yaml", ".yml"):
+        return load_protocol_yaml(name_or_path)
+
+    # Also check configs/protocols/ directory
+    configs_dir = Path(__file__).parent.parent / "configs" / "protocols"
+    candidate = configs_dir / f"{name_or_path}.yaml"
+    if candidate.exists():
+        return load_protocol_yaml(str(candidate))
+
+    raise ValueError(
+        f"Unknown protocol '{name_or_path}'. "
+        f"Available: {sorted(PROTOCOLS)} or provide a YAML file path."
+    )

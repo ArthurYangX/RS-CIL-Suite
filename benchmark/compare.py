@@ -134,19 +134,154 @@ def print_latex(results: list[dict]):
     print(r"\end{table}")
 
 
+def print_markdown(results: list[dict]):
+    """Print a GitHub-flavored Markdown leaderboard table."""
+    groups = defaultdict(list)
+    for r in results:
+        groups[r.get("method", "?")].append(r)
+
+    # Collect all datasets
+    all_ds = sorted({ds for r in results for ds in r.get("tasks", [{}])[-1].get("per_dataset", {}).keys()})
+
+    rows = []
+    for method, rs in sorted(groups.items()):
+        oa  = sum(r.get("final_oa",    r.get("oa_mean",    0)) for r in rs) / len(rs)
+        aa  = sum(r.get("final_aa",    r.get("aa_mean",    0)) for r in rs) / len(rs)
+        kap = sum(r.get("final_kappa", r.get("kappa_mean", 0)) for r in rs) / len(rs)
+        bwt = sum(r.get("bwt",         r.get("bwt_mean",   0)) for r in rs) / len(rs)
+        fwt = sum(r.get("fwt",         r.get("fwt_mean",   0)) for r in rs) / len(rs)
+        n   = len(rs)
+
+        # Std if multiple seeds
+        oa_std = 0
+        if n > 1:
+            import statistics
+            oa_std = statistics.stdev(r.get("final_oa", r.get("oa_mean", 0)) for r in rs)
+
+        per_ds = {}
+        for r in rs:
+            tasks = r.get("tasks", [])
+            if tasks:
+                for ds, v in tasks[-1].get("per_dataset", {}).items():
+                    per_ds.setdefault(ds, []).append(v)
+        per_ds_avg = {ds: sum(vs)/len(vs) for ds, vs in per_ds.items()}
+
+        rows.append({
+            "method": method, "oa": oa, "oa_std": oa_std,
+            "aa": aa, "kappa": kap, "bwt": bwt, "fwt": fwt,
+            "per_ds": per_ds_avg, "n": n,
+            "protocol": rs[0].get("protocol", "?"),
+        })
+
+    rows.sort(key=lambda r: r["oa"], reverse=True)
+
+    # Build markdown table
+    protocol = rows[0]["protocol"] if rows else "?"
+    ds_cols = all_ds if len(all_ds) <= 5 else []
+
+    print(f"\n## Leaderboard — Protocol {protocol}\n")
+
+    # Header
+    header = "| Rank | Method | OA (%) | AA (%) | BWT (pp) | FWT (%) |"
+    separator = "|:----:|:-------|-------:|-------:|---------:|--------:|"
+    for ds in ds_cols:
+        header += f" {ds} |"
+        separator += " ------:|"
+
+    print(header)
+    print(separator)
+
+    # Rows
+    for rank, r in enumerate(rows, 1):
+        oa_str = f"{r['oa']*100:.2f}"
+        if r["oa_std"] > 0:
+            oa_str += f" +/- {r['oa_std']*100:.2f}"
+
+        line = (f"| {rank} | **{r['method']}** | {oa_str} | "
+                f"{r['aa']*100:.2f} | {r['bwt']*100:.2f} | {r['fwt']*100:.2f} |")
+        for ds in ds_cols:
+            v = r["per_ds"].get(ds)
+            line += f" {v*100:.1f} |" if v is not None else " - |"
+        print(line)
+
+    print(f"\n*{sum(r['n'] for r in rows)} runs across {len(rows)} methods.*\n")
+
+
+def generate_leaderboard_file(results_dir: str, output: str = "LEADERBOARD.md"):
+    """Scan results directory and generate a leaderboard markdown file.
+
+    Usage:
+        python benchmark/compare.py results/ --leaderboard --output LEADERBOARD.md
+    """
+    from pathlib import Path
+    import sys
+    from io import StringIO
+
+    results_dir = Path(results_dir)
+    all_results = []
+    for f in sorted(results_dir.glob("**/*.json")):
+        try:
+            with open(f) as fp:
+                d = json.load(fp)
+            d["_file"] = str(f)
+            all_results.append(d)
+        except Exception:
+            continue
+
+    if not all_results:
+        print(f"No JSON results found in {results_dir}")
+        return
+
+    # Group by protocol
+    by_proto = defaultdict(list)
+    for r in all_results:
+        proto = r.get("protocol", "unknown")
+        by_proto[proto].append(r)
+
+    # Capture markdown output
+    old_stdout = sys.stdout
+    buf = StringIO()
+    sys.stdout = buf
+
+    print("# RS-CIL-Bench Leaderboard\n")
+    print("Auto-generated from experiment results.\n")
+
+    for proto in sorted(by_proto):
+        print_markdown(by_proto[proto])
+
+    sys.stdout = old_stdout
+    content = buf.getvalue()
+
+    out_path = Path(output)
+    out_path.write_text(content)
+    print(f"Leaderboard saved → {out_path}")
+    print(content)
+
+
 def main():
     p = argparse.ArgumentParser(description="RS-CIL results comparison tool")
-    p.add_argument("files", nargs="+", help="JSON result files (glob patterns ok)")
+    p.add_argument("files", nargs="+", help="JSON result files or directory (glob patterns ok)")
     p.add_argument("--latex", action="store_true", help="Output LaTeX table")
+    p.add_argument("--markdown", action="store_true", help="Output GitHub Markdown leaderboard")
+    p.add_argument("--leaderboard", action="store_true",
+                   help="Generate leaderboard file from results directory")
+    p.add_argument("--output", default="LEADERBOARD.md",
+                   help="Output file for --leaderboard mode")
     p.add_argument("--group-by", default="method", choices=["method", "protocol", "seed"],
                    help="Column to group results by")
     args = p.parse_args()
+
+    if args.leaderboard:
+        generate_leaderboard_file(args.files[0], args.output)
+        return
 
     results = load_results(args.files)
     print(f"Loaded {len(results)} result(s) from {len(args.files)} pattern(s).")
 
     if args.latex:
         print_latex(results)
+    elif args.markdown:
+        print_markdown(results)
     else:
         print_table(results, group_by=args.group_by)
 

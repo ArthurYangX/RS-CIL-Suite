@@ -1,0 +1,13 @@
+# RS-CIL Benchmark — shared defaults
+# Method-specific YAML files override these values.
+
+model:
+  backbone: simple_encoder
+  d: 128
+
+training:
+  epochs: 50
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  optimizer: adamw
+  scheduler: cosine

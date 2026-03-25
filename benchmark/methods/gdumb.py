@@ -11,16 +11,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("gdumb")
 class GDumb(CILMethod):
     name = "GDumb"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs_final=100, lr=1e-3, memory_size=2000):
+                 d=128, epochs_final=100, lr=1e-3, memory_size=2000, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.hsi_ch = hsi_channels
@@ -112,3 +113,16 @@ class GDumb(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        return {
+            "_buf_hsi": [t.cpu() for t in self._buf_hsi],
+            "_buf_lidar": [t.cpu() for t in self._buf_lidar],
+            "_buf_labels": [t.cpu() for t in self._buf_labels],
+        }
+
+    def _load_method_state(self, ckpt: dict):
+        self._buf_hsi = ckpt["_buf_hsi"]
+        self._buf_lidar = ckpt["_buf_lidar"]
+        self._buf_labels = ckpt["_buf_labels"]

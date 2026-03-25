@@ -1,0 +1,7 @@
+# BiC — Bias Correction
+method:
+  memory_size: 2000
+  T: 2.0
+  bias_epochs: 200
+  bias_lr: 1.0e-3
+  val_ratio: 0.1

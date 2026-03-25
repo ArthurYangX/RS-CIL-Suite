@@ -10,16 +10,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from .ncm import SimpleEncoder
 from benchmark.protocols.cil import Task
 
 
+@register_method("ewc")
 class EWC(CILMethod):
     name = "EWC"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs=50, lr=1e-3, ewc_lambda=5000.0):
+                 d=128, epochs=50, lr=1e-3, ewc_lambda=5000.0, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d
@@ -104,3 +105,16 @@ class EWC(CILMethod):
             all_p.append(torch.tensor([cids[i] for i in idx.cpu().tolist()]))
             all_t.append(y)
         return torch.cat(all_p).numpy(), torch.cat(all_t).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        return {
+            "head": self.head.state_dict(),
+            "_fisher": [{n: f.cpu() for n, f in fd.items()} for fd in self._fisher],
+            "_opt_params": [{n: p.cpu() for n, p in od.items()} for od in self._opt_params],
+        }
+
+    def _load_method_state(self, ckpt: dict):
+        self.head.load_state_dict(ckpt["head"])
+        self._fisher = ckpt["_fisher"]
+        self._opt_params = ckpt["_opt_params"]

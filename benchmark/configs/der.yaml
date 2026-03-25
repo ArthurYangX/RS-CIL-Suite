@@ -1,0 +1,5 @@
+# DER++ — Dark Experience Replay
+method:
+  memory_size: 2000
+  alpha: 0.1
+  beta: 0.5

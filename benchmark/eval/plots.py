@@ -327,3 +327,404 @@ class _SimpleTaskResult:
 
 def _json_to_result(d: dict, protocol: str, method: str) -> _SimpleResult:
     return _SimpleResult(d, protocol, method)
+
+
+# ══════════════════════════════════════════════════════════════════
+# 6. Classification map (RGB)
+# ══════════════════════════════════════════════════════════════════
+
+def plot_classification_map(
+    gt_map: np.ndarray,
+    preds: np.ndarray,
+    targets: np.ndarray,
+    class_names: list[str],
+    dataset_name: str | None = None,
+    title: str = "",
+    save: str | None = None,
+    show_legend: bool = True,
+    show_errors: bool = False,
+):
+    """Render a classification map overlaying predictions on the ground truth.
+
+    Args:
+        gt_map:       (H, W) int array, 1-indexed (0 = background).
+        preds:        (N,) predicted class IDs (global).
+        targets:      (N,) ground-truth class IDs (global).
+        class_names:  List of class names for the legend.
+        dataset_name: Dataset name for colour palette lookup.
+        title:        Figure title.
+        save:         Path to save (pdf/png/svg).
+        show_legend:  Whether to show the colour legend.
+        show_errors:  If True, highlight misclassifications in red.
+    """
+    from benchmark.eval.colors import get_colormap, label_map_to_rgb
+
+    _set_style()
+    plt = _mpl()
+
+    num_classes = len(class_names)
+    ds_name = dataset_name or ""
+    cmap = get_colormap(ds_name, num_classes)
+
+    # Build the RGB image from ground truth (faded background)
+    gt_rgb = label_map_to_rgb(gt_map, ds_name, num_classes).astype(np.float32)
+    # Fade non-test background
+    gt_rgb *= 0.3
+
+    # Reconstruct prediction map from (preds, targets) — map back to spatial coords
+    # We overlay predictions onto the GT map where test pixels exist
+    pred_map = np.zeros_like(gt_map)
+    test_coords = _find_test_coords(gt_map, targets)
+    if test_coords is not None:
+        for (r, c), p in zip(test_coords, preds):
+            pred_map[r, c] = p
+
+        # Paint predictions with full saturation
+        for (r, c), p in zip(test_coords, preds):
+            if p > 0 and p <= num_classes:
+                gt_rgb[r, c] = cmap[int(p)].astype(np.float32)
+
+        if show_errors:
+            for (r, c), p, t in zip(test_coords, preds, targets):
+                if p != t:
+                    gt_rgb[r, c] = [255, 0, 0]  # red for errors
+
+    gt_rgb = np.clip(gt_rgb, 0, 255).astype(np.uint8)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.imshow(gt_rgb)
+    ax.set_title(title or f"Classification Map — {ds_name}", fontsize=12)
+    ax.axis("off")
+
+    if show_legend and class_names:
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor=np.array(cmap[i + 1]) / 255.0, label=name)
+            for i, name in enumerate(class_names)
+        ]
+        ax.legend(handles=legend_elements, loc="lower right",
+                  fontsize=7, ncol=max(1, num_classes // 8),
+                  framealpha=0.8)
+
+    if save:
+        Path(save).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save, bbox_inches="tight")
+        print(f"[plot] saved → {save}")
+    plt.tight_layout()
+    return fig
+
+
+def _find_test_coords(gt_map, targets):
+    """Match test pixel targets back to their (row, col) in gt_map.
+
+    Returns (N, 2) array of (row, col) or None if matching fails.
+    """
+    # Build a mapping from label → list of coords in gt_map
+    unique_targets = np.unique(targets)
+    coords_by_class = {}
+    for c in unique_targets:
+        rows, cols = np.where(gt_map == c)
+        coords_by_class[c] = list(zip(rows, cols))
+
+    # Try to assign coords: iterate through targets, pop from coords_by_class
+    # This is approximate (test pixels are a subset of gt_map pixels)
+    result = []
+    usage = {c: 0 for c in unique_targets}
+    for t in targets:
+        c = int(t)
+        if c in coords_by_class and usage[c] < len(coords_by_class[c]):
+            result.append(coords_by_class[c][usage[c]])
+            usage[c] += 1
+        else:
+            result.append((0, 0))  # fallback
+
+    return np.array(result)
+
+
+# ══════════════════════════════════════════════════════════════════
+# 7. Classification maps per task (CIL evolution)
+# ══════════════════════════════════════════════════════════════════
+
+def plot_classification_maps_per_task(
+    gt_map: np.ndarray,
+    predictions_per_task: list[dict],
+    class_names: list[str],
+    dataset_name: str | None = None,
+    save: str | None = None,
+):
+    """Show classification evolution across CIL tasks as a subplot grid.
+
+    Args:
+        gt_map:               (H, W) ground truth map.
+        predictions_per_task: List of dicts, each with keys:
+                              "preds", "targets", "task_id".
+        class_names:          Class names for legend.
+        dataset_name:         For colour palette.
+        save:                 Path to save figure.
+    """
+    from benchmark.eval.colors import get_colormap, label_map_to_rgb
+
+    _set_style()
+    plt = _mpl()
+
+    n_tasks = len(predictions_per_task)
+    fig, axes = plt.subplots(1, n_tasks, figsize=(4 * n_tasks, 5))
+    if n_tasks == 1:
+        axes = [axes]
+
+    num_classes = len(class_names)
+    ds_name = dataset_name or ""
+    cmap = get_colormap(ds_name, num_classes)
+
+    for ax, task_data in zip(axes, predictions_per_task):
+        gt_rgb = label_map_to_rgb(gt_map, ds_name, num_classes).astype(np.float32)
+        gt_rgb *= 0.3
+
+        test_coords = _find_test_coords(gt_map, task_data["targets"])
+        if test_coords is not None:
+            for (r, c), p in zip(test_coords, task_data["preds"]):
+                if 0 < p <= num_classes:
+                    gt_rgb[r, c] = cmap[int(p)].astype(np.float32)
+
+        gt_rgb = np.clip(gt_rgb, 0, 255).astype(np.uint8)
+        ax.imshow(gt_rgb)
+        ax.set_title(f"Task {task_data.get('task_id', '?')}", fontsize=10)
+        ax.axis("off")
+
+    plt.suptitle(f"CIL Evolution — {ds_name}", fontsize=13)
+    if save:
+        Path(save).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save, bbox_inches="tight")
+        print(f"[plot] saved → {save}")
+    plt.tight_layout()
+    return fig
+
+
+# ══════════════════════════════════════════════════════════════════
+# 8. Confusion matrix
+# ══════════════════════════════════════════════════════════════════
+
+def plot_confusion_matrix(
+    preds: np.ndarray,
+    targets: np.ndarray,
+    class_names: list[str] | None = None,
+    normalize: bool = True,
+    save: str | None = None,
+    title: str = "",
+):
+    """Plot a confusion matrix heatmap.
+
+    Args:
+        preds:       (N,) predicted labels.
+        targets:     (N,) true labels.
+        class_names: Labels for axes. If None, uses sorted unique targets.
+        normalize:   If True, normalize rows to sum to 1 (recall-based).
+        save:        Path to save.
+        title:       Figure title.
+    """
+    from sklearn.metrics import confusion_matrix as sk_cm
+
+    _set_style()
+    plt = _mpl()
+    sns = _sns()
+
+    labels = sorted(set(targets.tolist()) | set(preds.tolist()))
+    cm = sk_cm(targets, preds, labels=labels)
+    if normalize:
+        row_sums = cm.sum(axis=1, keepdims=True)
+        cm = np.where(row_sums > 0, cm / row_sums, 0) * 100
+
+    names = class_names or [str(l) for l in labels]
+    # Truncate names if too long
+    names = [n[:15] for n in names]
+
+    n = len(labels)
+    fig, ax = plt.subplots(figsize=(max(6, n * 0.6), max(5, n * 0.5)))
+    sns.heatmap(
+        cm, ax=ax, annot=True,
+        fmt=".1f" if normalize else "d",
+        cmap="Blues", vmin=0, vmax=100 if normalize else None,
+        xticklabels=names[:n], yticklabels=names[:n],
+        linewidths=0.3, linecolor="white",
+        cbar_kws={"label": "Recall (%)" if normalize else "Count"},
+    )
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    ax.set_title(title or "Confusion Matrix")
+
+    if save:
+        Path(save).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save, bbox_inches="tight")
+        print(f"[plot] saved → {save}")
+    plt.tight_layout()
+    return fig
+
+
+# ══════════════════════════════════════════════════════════════════
+# 9. Per-class accuracy bar chart
+# ══════════════════════════════════════════════════════════════════
+
+def plot_per_class_accuracy(
+    preds: np.ndarray,
+    targets: np.ndarray,
+    class_names: list[str] | None = None,
+    save: str | None = None,
+    title: str = "",
+):
+    """Horizontal bar chart of per-class recall.
+
+    Args:
+        preds:       (N,) predicted labels.
+        targets:     (N,) true labels.
+        class_names: Labels for bars.
+        save:        Path to save.
+        title:       Figure title.
+    """
+    _set_style()
+    plt = _mpl()
+
+    labels = sorted(set(targets.tolist()))
+    accs = []
+    for c in labels:
+        mask = targets == c
+        accs.append((preds[mask] == c).mean() * 100 if mask.sum() > 0 else 0)
+
+    names = class_names or [str(l) for l in labels]
+    names = [n[:20] for n in names]
+
+    fig, ax = plt.subplots(figsize=(8, max(4, len(labels) * 0.35)))
+    colors = [_PALETTE[i % len(_PALETTE)] for i in range(len(labels))]
+    bars = ax.barh(range(len(labels)), accs, color=colors, height=0.7)
+
+    for bar, acc in zip(bars, accs):
+        ax.text(bar.get_width() + 0.5, bar.get_y() + bar.get_height() / 2,
+                f"{acc:.1f}%", ha="left", va="center", fontsize=8)
+
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(names[:len(labels)], fontsize=9)
+    ax.set_xlabel("Accuracy (%)")
+    ax.set_xlim(0, 105)
+    ax.set_title(title or "Per-Class Accuracy")
+    ax.invert_yaxis()
+
+    if save:
+        Path(save).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save, bbox_inches="tight")
+        print(f"[plot] saved → {save}")
+    plt.tight_layout()
+    return fig
+
+
+# ══════════════════════════════════════════════════════════════════
+# 10. Radar / spider chart (per-dataset comparison)
+# ══════════════════════════════════════════════════════════════════
+
+def plot_radar_comparison(
+    results: dict[str, dict[str, float]],
+    save: str | None = None,
+    title: str = "Per-Dataset Accuracy",
+):
+    """Spider chart comparing methods across datasets.
+
+    Args:
+        results: {method_name: {dataset_name: AA_percentage}}.
+        save:    Path to save.
+        title:   Figure title.
+    """
+    _set_style()
+    plt = _mpl()
+
+    # Get all dataset names (union across methods)
+    all_datasets = sorted({ds for m in results.values() for ds in m})
+    n = len(all_datasets)
+    if n < 3:
+        print("[plot_radar] need ≥3 datasets for radar chart, skipping")
+        return
+
+    angles = np.linspace(0, 2 * np.pi, n, endpoint=False).tolist()
+    angles += angles[:1]  # close polygon
+
+    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+
+    for i, (method_name, ds_accs) in enumerate(results.items()):
+        vals = [ds_accs.get(ds, 0) for ds in all_datasets]
+        vals += vals[:1]
+        color = _PALETTE[i % len(_PALETTE)]
+        ax.plot(angles, vals, "o-", color=color, linewidth=2,
+                label=method_name, markersize=5)
+        ax.fill(angles, vals, alpha=0.1, color=color)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(all_datasets, fontsize=9)
+    ax.set_ylim(0, 100)
+    ax.set_title(title, y=1.08, fontsize=13)
+    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.0), fontsize=9)
+
+    if save:
+        Path(save).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save, bbox_inches="tight")
+        print(f"[plot] saved → {save}")
+    return fig
+
+
+# ══════════════════════════════════════════════════════════════════
+# 11. Method comparison table (matplotlib rendered)
+# ══════════════════════════════════════════════════════════════════
+
+def plot_method_comparison_table(
+    results: dict[str, dict],
+    metrics: tuple[str, ...] = ("final_oa", "final_aa", "bwt"),
+    save: str | None = None,
+):
+    """Render a styled table comparing methods on multiple metrics.
+
+    Args:
+        results: {method_name: dict with metric keys}.
+        metrics: Which metrics to show.
+        save:    Path to save.
+    """
+    _set_style()
+    plt = _mpl()
+
+    methods = list(results.keys())
+    label_map = {
+        "final_oa": "OA (%)", "final_aa": "AA (%)", "final_kappa": "κ",
+        "bwt": "BWT (pp)", "fwt": "FWT (%)",
+    }
+    headers = [label_map.get(m, m) for m in metrics]
+
+    cell_text = []
+    for method in methods:
+        row = []
+        for m in metrics:
+            val = results[method].get(m, 0)
+            scale = 100 if m not in ("final_kappa",) else 1
+            row.append(f"{val * scale:.2f}")
+        cell_text.append(row)
+
+    fig, ax = plt.subplots(figsize=(max(6, len(metrics) * 1.5),
+                                     max(3, len(methods) * 0.4 + 1)))
+    ax.axis("off")
+    table = ax.table(
+        cellText=cell_text,
+        rowLabels=methods,
+        colLabels=headers,
+        cellLoc="center",
+        loc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.2, 1.5)
+
+    # Highlight best per column
+    for col_idx in range(len(metrics)):
+        vals = [float(cell_text[r][col_idx]) for r in range(len(methods))]
+        best_row = int(np.argmax(vals)) if metrics[col_idx] != "bwt" else int(np.argmin([abs(v) for v in vals]))
+        table[best_row + 1, col_idx].set_facecolor("#d4edda")
+
+    if save:
+        Path(save).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save, bbox_inches="tight")
+        print(f"[plot] saved → {save}")
+    return fig

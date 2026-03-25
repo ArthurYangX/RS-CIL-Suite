@@ -1,0 +1,4 @@
+# GPM — Gradient Projection Memory
+method:
+  threshold: 0.97
+  eps: 0.1

@@ -13,29 +13,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from .base import CILMethod
+from .base import CILMethod, register_method
 from benchmark.protocols.cil import Task
 
 
-class SimpleEncoder(nn.Module):
-    """Lightweight CNN that encodes (C, 7, 7) patches → d-dim feature vector."""
-
-    def __init__(self, hsi_ch: int, lidar_ch: int, d: int = 128):
-        super().__init__()
-        in_ch = hsi_ch + lidar_ch
-        self.net = nn.Sequential(
-            nn.Conv2d(in_ch, 64, 3, padding=1), nn.BatchNorm2d(64), nn.GELU(),
-            nn.Conv2d(64, 128, 3, padding=1),   nn.BatchNorm2d(128), nn.GELU(),
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.Linear(128, d),
-        )
-
-    def forward(self, xh, xl):
-        x = torch.cat([xh, xl], dim=1)
-        return F.normalize(self.net(x), dim=1)
+# SimpleEncoder moved to benchmark.models — re-exported here for backward compat
+from benchmark.models import SimpleEncoder  # noqa: F401
 
 
+@register_method("ncm")
 class NCMMethod(CILMethod):
     """Frozen backbone NCM.
 
@@ -49,7 +35,7 @@ class NCMMethod(CILMethod):
 
     def __init__(self, hsi_channels: int, lidar_channels: int,
                  num_classes: int, device: torch.device, d: int = 128,
-                 epochs: int = 50, lr: float = 1e-3):
+                 epochs: int = 50, lr: float = 1e-3, **kwargs):
         model = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(model, device, num_classes)
         self.d = d
@@ -134,3 +120,14 @@ class NCMMethod(CILMethod):
             all_targets.append(y)
 
         return torch.cat(all_preds).numpy(), torch.cat(all_targets).numpy()
+
+    # ── checkpoint ──────────────────────────────────────────────
+    def _method_state(self) -> dict:
+        return {
+            "prototypes": {k: v.cpu() for k, v in self.prototypes.items()},
+            "_frozen": self._frozen,
+        }
+
+    def _load_method_state(self, ckpt: dict):
+        self.prototypes = ckpt["prototypes"]
+        self._frozen = ckpt["_frozen"]
