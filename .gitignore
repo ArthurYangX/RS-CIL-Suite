@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Data (too large for git)
+*.mat
+*.h5
+*.hdf5
+*.npz
+*.npy
+*.zip
+*.tar.gz
+*.tgz
+datasets/
+data/
+
+# Cached benchmark data
+benchmark/datasets/**/.cache/
+**/.cache/
+
+# Experiment outputs and logs
+*.log
+*.out
+results/
+outputs/
+runs/
+wandb/
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Research scratch files (keep but not tracked)
+refine-logs/
+prompts/
+papers/
+
+# Large JSON result dumps
+anchor_lora_*.json
+EXPERIMENT_RESULTS.md
+AUTO_REVIEW.md
+REVIEW_STATE.json
+
+# Claude memory (local to machine)
+.claude/
