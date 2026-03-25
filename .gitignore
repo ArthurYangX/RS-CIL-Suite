@@ -15,7 +15,7 @@ build/
 venv/
 env/
 
-# Data (too large for git)
+# Data files (too large for git)
 *.mat
 *.h5
 *.hdf5
@@ -24,10 +24,20 @@ env/
 *.zip
 *.tar.gz
 *.tgz
-datasets/
-data/
 
-# Cached benchmark data
+# Raw dataset directories (actual data, not source code)
+# Use ~/datasets/rs_cil/ as download target instead
+**/datasets/Trento/
+**/datasets/Houston*/
+**/datasets/MUUFL/
+**/datasets/Augsburg/
+**/datasets/IndianPines/
+**/datasets/PaviaU/
+**/datasets/Salinas/
+**/datasets/Berlin/
+**/datasets/WHU-Hi-LongKou/
+
+# Cached preprocessed patches
 benchmark/datasets/**/.cache/
 **/.cache/
 
