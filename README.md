@@ -29,18 +29,20 @@ All 10 datasets download automatically via `download.py` (no registration requir
 
 | Dataset | Modality | Classes | Size | Source |
 |---------|----------|---------|------|--------|
-| Trento | HSI + LiDAR | 6 | 166×600 | GitHub (tyust-dayu) |
-| Houston2013 | HSI + LiDAR | 15 | 349×1905 | rs-fusion-datasets-dist |
-| MUUFL | HSI + LiDAR | 11 | 325×220 | GatorSense GitHub |
-| Augsburg | HSI + SAR | 8 | 332×485 | rs-fusion-datasets-dist |
-| Houston2018 | HSI + LiDAR | 20 | 1202×4768 | rs-fusion-datasets-dist |
-| IndianPines | HSI | 16 | 145×145 | EHU/GIC |
-| PaviaU | HSI | 9 | 610×340 | EHU/GIC |
-| Salinas | HSI | 16 | 512×217 | EHU/GIC |
-| Berlin | HSI + SAR | 8 | 476×1723 | rs-fusion-datasets-dist |
-| WHU-Hi-LongKou | UAV HSI | 9 | 550×400 | HuggingFace (danaroth/whu_hi) |
+| [Trento](https://github.com/tyust-dayu/Trento) | HSI + LiDAR | 6 | 166×600 | [tyust-dayu/Trento](https://github.com/tyust-dayu/Trento) |
+| [Houston2013](https://github.com/songyz2019/rs-fusion-datasets-dist) | HSI + LiDAR | 15 | 349×1905 | [rs-fusion-datasets-dist](https://github.com/songyz2019/rs-fusion-datasets-dist) |
+| [MUUFL](https://github.com/GatorSense/MUUFLGulfport) | HSI + LiDAR | 11 | 325×220 | [GatorSense/MUUFLGulfport](https://github.com/GatorSense/MUUFLGulfport) |
+| [Augsburg](https://github.com/songyz2019/rs-fusion-datasets-dist) | HSI + SAR | 8 | 332×485 | [rs-fusion-datasets-dist](https://github.com/songyz2019/rs-fusion-datasets-dist) |
+| [Houston2018](https://github.com/songyz2019/rs-fusion-datasets-dist) | HSI + LiDAR | 20 | 1202×4768 | [rs-fusion-datasets-dist](https://github.com/songyz2019/rs-fusion-datasets-dist) |
+| [IndianPines](https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes) | HSI | 16 | 145×145 | [EHU/GIC](https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes) |
+| [PaviaU](https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes) | HSI | 9 | 610×340 | [EHU/GIC](https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes) |
+| [Salinas](https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes) | HSI | 16 | 512×217 | [EHU/GIC](https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes) |
+| [Berlin](https://github.com/songyz2019/rs-fusion-datasets-dist) | HSI + SAR | 8 | 476×1723 | [rs-fusion-datasets-dist](https://github.com/songyz2019/rs-fusion-datasets-dist) |
+| [WHU-Hi-LongKou](https://huggingface.co/datasets/danaroth/whu_hi) | UAV HSI | 9 | 550×400 | [danaroth/whu_hi](https://huggingface.co/datasets/danaroth/whu_hi) |
 
 > WHU-Hi-LongKou uses ENVI `.bsq` format. Requires: `pip install spectral`
+
+We thank all dataset providers for making their data publicly available.
 
 ---
 
