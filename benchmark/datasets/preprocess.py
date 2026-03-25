@@ -100,6 +100,28 @@ def build_labels(counts_per_class: list[int]) -> np.ndarray:
 
 # ── Index-based split helper (rs-fusion-datasets-dist format) ────
 
+def linear_index_to_label_maps(
+    gt: np.ndarray,          # (H, W) full ground-truth label map (1..K, 0=bg)
+    tr_linear: np.ndarray,   # 0-based linear indices into flattened (H*W) image
+    te_linear: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert linear pixel indices (OUC/rs-fusion-datasets format) to TR/TE maps.
+
+    Used by Houston2018, Augsburg, Berlin whose index.mat files store
+    flat linear pixel indices (`augsburg_train`, `houston_train`, `berlin_train`).
+    """
+    H, W = gt.shape
+    tr_map = np.zeros((H, W), dtype=np.int32)
+    te_map = np.zeros((H, W), dtype=np.int32)
+    for i in tr_linear.ravel().astype(np.int64):
+        r, c = divmod(int(i), W)
+        tr_map[r, c] = int(gt[r, c])
+    for i in te_linear.ravel().astype(np.int64):
+        r, c = divmod(int(i), W)
+        te_map[r, c] = int(gt[r, c])
+    return tr_map, te_map
+
+
 def index_to_label_maps(
     gt: np.ndarray,        # (N,) label array for all labeled pixels (1-indexed)
     tr_idx: np.ndarray,    # (N_tr,) 0-based indices into gt for training pixels
@@ -107,11 +129,7 @@ def index_to_label_maps(
     coords: np.ndarray,    # (N, 2) row/col coordinates for all labeled pixels
     H: int, W: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Convert coordinate+index split into TR/TE label maps.
-
-    Used by Houston2018, Augsburg, Berlin (rs-fusion-datasets-dist format).
-    Returns tr_map and te_map of shape (H, W) with values 1..K or 0.
-    """
+    """Convert coordinate+index split into TR/TE label maps (legacy helper)."""
     tr_map = np.zeros((H, W), dtype=np.int32)
     te_map = np.zeros((H, W), dtype=np.int32)
     for i in tr_idx.ravel():

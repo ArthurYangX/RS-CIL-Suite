@@ -32,11 +32,17 @@ DATASET_SOURCES: dict[str, dict] = {
 
     "Trento": {
         "desc": "Trento HSI+LiDAR (6 classes, 166×600)",
-        "method": "direct_zip",
-        "zip_url": "https://github.com/tyust-dayu/Trento/archive/b4afc449.zip",
-        "zip_name": "Trento.zip",
+        "method": "direct",
+        "files": [
+            # tyust-dayu/Trento GitHub raw files (confirmed public, no login)
+            {"url": "https://raw.githubusercontent.com/tyust-dayu/Trento/main/Italy_hsi.mat",
+             "dest": "Italy_hsi.mat"},
+            {"url": "https://raw.githubusercontent.com/tyust-dayu/Trento/main/Italy_lidar.mat",
+             "dest": "Italy_lidar.mat"},
+            {"url": "https://raw.githubusercontent.com/tyust-dayu/Trento/main/allgrd.mat",
+             "dest": "allgrd.mat"},
+        ],
         "extract_dir": "Trento",
-        "expected_files": ["HSI.mat", "LiDAR.mat", "TRLabel.mat", "TSLabel.mat"],
         "manual_url": "https://github.com/tyust-dayu/Trento",
     },
 
@@ -103,38 +109,44 @@ DATASET_SOURCES: dict[str, dict] = {
 
     "IndianPines": {
         "desc": "Indian Pines AVIRIS (16 classes, 145×145)",
-        "method": "huggingface",
-        "hf_repo": "danaroth/indian_pines",
+        "method": "direct",
         "files": [
-            "Indian_pines_corrected.mat",
-            "Indian_pines_gt.mat",
+            # EHU/GIC direct download (confirmed accessible, ~5.7MB + 1KB)
+            {"url": "https://www.ehu.eus/ccwintco/uploads/6/67/Indian_pines_corrected.mat",
+             "dest": "Indian_pines_corrected.mat"},
+            {"url": "https://www.ehu.eus/ccwintco/uploads/c/c4/Indian_pines_gt.mat",
+             "dest": "Indian_pines_gt.mat"},
         ],
         "extract_dir": "IndianPines",
-        "manual_url": "https://huggingface.co/datasets/danaroth/indian_pines",
+        "manual_url": "https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes",
     },
 
     "PaviaU": {
         "desc": "Pavia University ROSIS (9 classes, 610×340)",
-        "method": "huggingface",
-        "hf_repo": "danaroth/pavia",
+        "method": "direct",
         "files": [
-            "PaviaU.mat",
-            "PaviaU_gt.mat",
+            # EHU/GIC direct download (~33.2MB + 10KB)
+            {"url": "https://www.ehu.eus/ccwintco/uploads/e/ee/PaviaU.mat",
+             "dest": "PaviaU.mat"},
+            {"url": "https://www.ehu.eus/ccwintco/uploads/5/50/PaviaU_gt.mat",
+             "dest": "PaviaU_gt.mat"},
         ],
         "extract_dir": "PaviaU",
-        "manual_url": "https://huggingface.co/datasets/danaroth/pavia",
+        "manual_url": "https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes",
     },
 
     "Salinas": {
         "desc": "Salinas Valley AVIRIS (16 classes, 512×217)",
-        "method": "huggingface",
-        "hf_repo": "danaroth/salinas",
+        "method": "direct",
         "files": [
-            "Salinas_corrected.mat",
-            "Salinas_gt.mat",
+            # EHU/GIC direct download (~25.3MB + 4KB)
+            {"url": "https://www.ehu.eus/ccwintco/uploads/a/a3/Salinas_corrected.mat",
+             "dest": "Salinas_corrected.mat"},
+            {"url": "https://www.ehu.eus/ccwintco/uploads/f/fa/Salinas_gt.mat",
+             "dest": "Salinas_gt.mat"},
         ],
         "extract_dir": "Salinas",
-        "manual_url": "https://huggingface.co/datasets/danaroth/salinas",
+        "manual_url": "https://www.ehu.eus/ccwintco/index.php/Hyperspectral_Remote_Sensing_Scenes",
     },
 
     # ── HSI + SAR ─────────────────────────────────────────────────
@@ -156,18 +168,25 @@ DATASET_SOURCES: dict[str, dict] = {
     # ── UAV HSI ───────────────────────────────────────────────────
 
     "WHU-Hi-LongKou": {
-        "desc": "WHU-Hi-LongKou UAV HSI (9 classes, 550×400)",
+        "desc": "WHU-Hi-LongKou UAV HSI (9 classes, 550×400) — ENVI .bsq format",
         "method": "huggingface",
         "hf_repo": "danaroth/whu_hi",
+        # Files are in ENVI .bsq format (no .mat available without registration)
+        # pip install spectral   to read .bsq files
         "files": [
-            "WHU-Hi-LongKou/WHU_Hi_LongKou.mat",
-            "WHU-Hi-LongKou/WHU_Hi_LongKou_gt.mat",
+            "WHU-Hi-LongKou/WHU-Hi-LongKou.bsq",
+            "WHU-Hi-LongKou/WHU-Hi-LongKou.hdr",
+            "WHU-Hi-LongKou/WHU-Hi-LongKou_gt.bsq",
+            "WHU-Hi-LongKou/WHU-Hi-LongKou_gt.hdr",
         ],
         "dest_names": [
-            "WHU_Hi_LongKou.mat",
-            "WHU_Hi_LongKou_gt.mat",
+            "WHU-Hi-LongKou.bsq",
+            "WHU-Hi-LongKou.hdr",
+            "WHU-Hi-LongKou_gt.bsq",
+            "WHU-Hi-LongKou_gt.hdr",
         ],
         "extract_dir": "WHU-Hi-LongKou",
+        "note": "Requires: pip install spectral (for reading .bsq format)",
         "manual_url": "https://huggingface.co/datasets/danaroth/whu_hi",
     },
 }
@@ -248,6 +267,20 @@ def download_dataset(name: str, root: Path) -> bool:
         if "note" in src:
             print(f"  Note: {src['note']}")
         return False
+
+    if method == "direct":
+        ok = True
+        for f in src["files"]:
+            dest = ds_dir / f["dest"]
+            if dest.exists():
+                print(f"  [SKIP] {f['dest']} already exists.")
+                continue
+            print(f"  Downloading {f['dest']} ...")
+            if not download_direct(f["url"], dest):
+                print(f"  [WARN] Failed: {f['url']}")
+                print(f"  Manual URL: {src.get('manual_url', 'N/A')}")
+                ok = False
+        return ok
 
     if method == "direct_zip":
         # Check if target files already exist

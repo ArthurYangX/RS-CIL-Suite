@@ -18,7 +18,7 @@ import numpy as np
 from scipy.io import loadmat
 
 from .base import RSDataset, DatasetInfo
-from .preprocess import preprocess_hsi_lidar, index_to_label_maps
+from .preprocess import preprocess_hsi_lidar, linear_index_to_label_maps
 
 
 def _zero_lidar(hsi: np.ndarray) -> np.ndarray:
@@ -152,25 +152,18 @@ class Berlin(RSDataset):
     )
 
     def _preprocess(self):
-        # rs-fusion-datasets-dist format: berlin_hsi.mat, berlin_sar.mat,
-        # berlin_gt.mat (H×W label map), berlin_index.mat (tr/te split)
+        # rs-fusion-datasets-dist (OUC) format:
+        # berlin_hsi.mat   key: berlin_hsi
+        # berlin_sar.mat   key: berlin_sar
+        # berlin_gt.mat    key: berlin_gt   (H×W label map, 1-indexed)
+        # berlin_index.mat keys: berlin_train, berlin_test (linear pixel indices, 1-indexed)
         hsi = loadmat(self.root / "berlin_hsi.mat")["berlin_hsi"].astype(np.float32)
         sar = loadmat(self.root / "berlin_sar.mat")["berlin_sar"].astype(np.float32)
-        gt_raw = loadmat(self.root / "berlin_gt.mat")
-        gt_key = [k for k in gt_raw if not k.startswith("_")][0]
-        gt = gt_raw[gt_key].astype(np.int32)
+        gt  = loadmat(self.root / "berlin_gt.mat")["berlin_gt"].astype(np.int32)
         idx = loadmat(self.root / "berlin_index.mat")
-        idx_key = [k for k in idx if not k.startswith("_")][0]
-        idx_data = idx[idx_key]
-        try:
-            tr_idx = idx_data["tr"][0, 0].ravel().astype(np.int32) - 1
-            te_idx = idx_data["te"][0, 0].ravel().astype(np.int32) - 1
-            labeled = np.argwhere(gt > 0)
-            gt_vals = gt[labeled[:, 0], labeled[:, 1]]
-            tr, te = index_to_label_maps(gt_vals, tr_idx, te_idx, labeled,
-                                         hsi.shape[0], hsi.shape[1])
-        except Exception:
-            tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
+        tr_linear = idx["berlin_train"].ravel().astype(np.int64) - 1
+        te_linear = idx["berlin_test"].ravel().astype(np.int64) - 1
+        tr, te = linear_index_to_label_maps(gt, tr_linear, te_linear)
         return preprocess_hsi_lidar(hsi, sar, tr, te,
                                     self.INFO.num_classes,
                                     self.patch_size, self.pca_components)
@@ -200,8 +193,24 @@ class WHUHiLongKou(RSDataset):
     )
 
     def _preprocess(self):
-        hsi = loadmat(self.root / "WHU_Hi_LongKou.mat")["WHU_Hi_LongKou"].astype(np.float32)
-        gt  = loadmat(self.root / "WHU_Hi_LongKou_gt.mat")["WHU_Hi_LongKou_gt"].astype(np.int32)
+        # Try .mat first (some sources provide this), fall back to ENVI .bsq
+        mat_path = self.root / "WHU_Hi_LongKou.mat"
+        if mat_path.exists():
+            hsi = loadmat(mat_path)["WHU_Hi_LongKou"].astype(np.float32)
+            gt  = loadmat(self.root / "WHU_Hi_LongKou_gt.mat")["WHU_Hi_LongKou_gt"].astype(np.int32)
+        else:
+            # ENVI .bsq format (HuggingFace danaroth/whu_hi mirror)
+            try:
+                import spectral
+            except ImportError:
+                raise ImportError(
+                    "WHU-Hi-LongKou uses ENVI .bsq format. "
+                    "Install with: pip install spectral"
+                )
+            hdr = str(self.root / "WHU-Hi-LongKou.hdr")
+            hsi = np.array(spectral.open_image(hdr).load(), dtype=np.float32)
+            gt_hdr = str(self.root / "WHU-Hi-LongKou_gt.hdr")
+            gt = np.array(spectral.open_image(gt_hdr).load()[:, :, 0], dtype=np.int32)
         tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
         lidar = _zero_lidar(hsi)
         return preprocess_hsi_lidar(hsi, lidar, tr, te,

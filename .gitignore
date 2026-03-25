@@ -75,3 +75,16 @@ REVIEW_STATE.json
 
 # Claude memory (local to machine)
 .claude/
+
+# Legacy experiment code (tracked separately)
+code/
+docs/
+paper/
+*.md
+!CLAUDE.md
+*.key
+*.json
+*.bib
+*.tex
+*.aux
+*.pdf

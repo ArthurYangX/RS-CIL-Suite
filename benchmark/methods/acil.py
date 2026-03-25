@@ -1,4 +1,4 @@
-"""ACIL — Analytic Class-Incremental Learning (Zhuang et al., NeurIPS 2023).
+"""ACIL — Analytic Class-Incremental Learning (Zhuang et al., NeurIPS 2022).
 
 Key idea: replace gradient-based training of the linear head with a closed-form
 recursive least-squares update. No exemplars, no forgetting, mathematically equivalent
