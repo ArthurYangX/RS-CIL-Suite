@@ -215,7 +215,7 @@ python benchmark/run.py --protocol configs/protocols/my_protocol.yaml \
   <em>iCaRL 在 A_Trento 上的表现：当前任务 OA（橙色）与旧任务均值（绿色）之间的差距揭示了稳定性-可塑性权衡。</em>
 </p>
 
-### 分类图（HyperKD 风格）
+### 分类图
 
 Ground Truth + 每个任务后的预测图，使用精确像素坐标。支持多方法并排对比。
 

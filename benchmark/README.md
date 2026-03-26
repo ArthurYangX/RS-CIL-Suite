@@ -216,7 +216,7 @@ Three lines decomposing OA over the task sequence: mean over all seen tasks, mea
   <em>iCaRL on A_Trento: the gap between current-task OA (orange) and old-task mean (green) reveals the stability-plasticity tradeoff.</em>
 </p>
 
-### Classification maps (HyperKD-style)
+### Classification maps
 
 Ground truth + prediction map after each task, using exact pixel coordinates. Supports multi-method side-by-side comparison.
 
