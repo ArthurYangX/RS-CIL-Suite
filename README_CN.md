@@ -192,12 +192,31 @@ python benchmark/run.py --protocol configs/protocols/my_protocol.yaml \
 使用 `--plot` 自动生成论文级图表：
 
 ### 任务精度矩阵
+
 行 = 被评估的任务，列 = 学习完第 *t* 个任务后。清晰展示遗忘（数值从左到右递减）和可塑性（对角线值）。
 
+<p align="center">
+  <img src="assets/icarl_A_IndianPines_seed0_task_matrix.png" width="45%" alt="iCaRL 任务矩阵">
+  &nbsp;&nbsp;
+  <img src="assets/ewc_A_IndianPines_seed0_task_matrix.png" width="45%" alt="EWC 任务矩阵">
+</p>
+<p align="center">
+  <em>左：iCaRL（回放）保留了部分旧任务精度。右：EWC（正则化）出现灾难性遗忘——仅对角线存活。</em>
+</p>
+
 ### 任务反馈曲线
-三条线分解 OA：所有已见任务均值、旧任务均值、当前任务精度。
+
+三条线分解 OA 在任务序列中的变化：所有已见任务均值、旧任务均值（遗忘指标）、当前任务精度（可塑性指标）。
+
+<p align="center">
+  <img src="assets/icarl_A_Trento_seed0_task_feedback_curve.png" width="55%" alt="iCaRL 反馈曲线">
+</p>
+<p align="center">
+  <em>iCaRL 在 A_Trento 上的表现：当前任务 OA（橙色）与旧任务均值（绿色）之间的差距揭示了稳定性-可塑性权衡。</em>
+</p>
 
 ### 分类图（HyperKD 风格）
+
 Ground Truth + 每个任务后的预测图，使用精确像素坐标。支持多方法并排对比。
 
 ```bash

@@ -193,12 +193,31 @@ python benchmark/run.py --protocol configs/protocols/my_protocol.yaml \
 The benchmark generates publication-quality figures automatically with `--plot`:
 
 ### Task accuracy matrix
+
 Rows = evaluated task, columns = after learning task *t*. Shows forgetting (values decreasing left-to-right) and plasticity (diagonal).
 
+<p align="center">
+  <img src="assets/icarl_A_IndianPines_seed0_task_matrix.png" width="45%" alt="iCaRL task matrix">
+  &nbsp;&nbsp;
+  <img src="assets/ewc_A_IndianPines_seed0_task_matrix.png" width="45%" alt="EWC task matrix">
+</p>
+<p align="center">
+  <em>Left: iCaRL (replay) retains partial old-task accuracy. Right: EWC (regularization) shows catastrophic forgetting — only the diagonal survives.</em>
+</p>
+
 ### Task feedback curve
-Three lines decomposing OA: mean over all seen tasks, mean over old tasks only, and current task accuracy.
+
+Three lines decomposing OA over the task sequence: mean over all seen tasks, mean over old tasks only (forgetting indicator), and current task accuracy (plasticity indicator).
+
+<p align="center">
+  <img src="assets/icarl_A_Trento_seed0_task_feedback_curve.png" width="55%" alt="iCaRL feedback curve">
+</p>
+<p align="center">
+  <em>iCaRL on A_Trento: the gap between current-task OA (orange) and old-task mean (green) reveals the stability-plasticity tradeoff.</em>
+</p>
 
 ### Classification maps (HyperKD-style)
+
 Ground truth + prediction map after each task, using exact pixel coordinates. Supports multi-method side-by-side comparison.
 
 ```bash

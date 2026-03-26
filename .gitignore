@@ -91,3 +91,4 @@ paper/
 *.aux
 *.pdf
 !README_CN.md
+!assets/
