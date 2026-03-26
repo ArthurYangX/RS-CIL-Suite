@@ -85,17 +85,43 @@ def main():
     ckpt_meta = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
     task_id = ckpt_meta.get("task_id", len(protocol.tasks) - 1)
     seen_classes = ckpt_meta.get("seen_classes", [])
+    run_meta = ckpt_meta.get("run_meta", {})
     print(f"Checkpoint: task_id={task_id}, "
           f"seen_classes={len(seen_classes)}, "
           f"method={ckpt_meta.get('method_name', '?')}")
+
+    # ── Resolve params: checkpoint run_meta is the default, CLI overrides ──
+    # This makes checkpoints self-describing: if the user doesn't pass
+    # --patch_size or --pca_components, we use what the checkpoint was
+    # trained with. Explicit CLI args always take precedence.
+    _patch_size = args.patch_size
+    _pca_components = args.pca_components
+    _backbone = None
+
+    if run_meta:
+        # Use checkpoint values as defaults when CLI is at default
+        if args.patch_size == 7 and "patch_size" in run_meta:
+            _patch_size = run_meta["patch_size"]
+        if args.pca_components == 36 and "pca_components" in run_meta:
+            _pca_components = run_meta["pca_components"]
+        if "backbone" in run_meta:
+            _backbone = run_meta["backbone"]
+        # Warn on mismatch
+        for key, cli_val, meta_val in [
+            ("patch_size", args.patch_size, run_meta.get("patch_size")),
+            ("pca_components", args.pca_components, run_meta.get("pca_components")),
+        ]:
+            if meta_val is not None and cli_val != 7 and cli_val != 36 and cli_val != meta_val:
+                print(f"[WARN] CLI --{key}={cli_val} differs from "
+                      f"checkpoint run_meta {key}={meta_val}")
 
     # ── Load datasets ─────────────────────────────────────────────
     datasets = {}
     for ds_name in protocol.dataset_order:
         root = Path(args.data_root) / ds_name
         datasets[ds_name] = get_dataset(ds_name, root=root,
-                                        patch_size=args.patch_size,
-                                        pca_components=args.pca_components)
+                                        patch_size=_patch_size,
+                                        pca_components=_pca_components)
         info = datasets[ds_name].info
         print(f"  [{ds_name}] {info.num_classes} classes | "
               f"test={len(datasets[ds_name].test)}")
@@ -118,11 +144,13 @@ def main():
                       cli_overrides=args.opts)
     flat_cfg = flatten_config(cfg)
 
-    # Map config key to method kwarg
+    # Map config key to method kwarg; checkpoint backbone takes priority
     if "_backbone" in flat_cfg:
         flat_cfg["backbone"] = flat_cfg.pop("_backbone")
+    if _backbone and "backbone" not in flat_cfg:
+        flat_cfg["backbone"] = _backbone
 
-    hsi_ch = args.pca_components
+    hsi_ch = _pca_components
     lid_ch = lid_ch_max
     kwargs = dict(hsi_channels=hsi_ch, lidar_channels=lid_ch,
                   num_classes=protocol.total_classes, device=device)

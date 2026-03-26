@@ -35,7 +35,7 @@
 - **8 种样本选择策略**（herding、k-center、entropy、k-means 等）
 - **任务感知评估** — 保存精确空间坐标，支持分类图可视化
 - **论文级可视化** — 任务精度矩阵、反馈曲线、HyperKD 风格分类图
-- **YAML 配置系统** — 支持 CLI 覆盖、wandb 集成、断点续训
+- **YAML 配置系统** — 支持 CLI 覆盖、wandb 集成、自描述 checkpoint
 - **66 个单元测试** + GitHub Actions CI
 
 ---
@@ -349,7 +349,7 @@ python benchmark/run.py --method my_method --protocol B1 --data_root ~/data
 
 ---
 
-## 断点续训与推理
+## Checkpoint 与推理
 
 ```bash
 # 每个任务后保存 checkpoint

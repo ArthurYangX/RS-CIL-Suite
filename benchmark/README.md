@@ -36,7 +36,7 @@
 - **8 exemplar selection strategies** (herding, k-center, entropy, k-means, etc.)
 - **Task-aware evaluation** with exact spatial coordinates for classification map visualization
 - **Publication-quality figures** — task accuracy matrices, feedback curves, HyperKD-style map grids
-- **YAML config system** with CLI overrides, wandb integration, and checkpoint/resume support
+- **YAML config system** with CLI overrides, wandb integration, and self-describing checkpoints
 - **66 unit tests** with GitHub Actions CI
 
 ---
