@@ -7,11 +7,7 @@ Usage:
 """
 from __future__ import annotations
 
-from .simple_encoder import SimpleEncoder
-
-_BACKBONE_REGISTRY: dict[str, type] = {
-    "simple_encoder": SimpleEncoder,
-}
+_BACKBONE_REGISTRY: dict[str, type] = {}
 
 
 def register_backbone(name: str):
@@ -47,3 +43,12 @@ def build_backbone(name: str, **kwargs) -> "torch.nn.Module":
 def list_backbones() -> list[str]:
     """Return sorted list of registered backbone names."""
     return sorted(_BACKBONE_REGISTRY.keys())
+
+
+# ── Register built-in backbones ──────────────────────────────────
+# Import AFTER register_backbone is defined to avoid circular imports.
+from .simple_encoder import SimpleEncoder  # noqa: E402
+_BACKBONE_REGISTRY["simple_encoder"] = SimpleEncoder
+
+from . import resnet_hsi   # noqa: E402, F401 — registers resnet18_hsi, resnet34_hsi
+from . import vit_hsi      # noqa: E402, F401 — registers vit_tiny_hsi, vit_small_hsi
