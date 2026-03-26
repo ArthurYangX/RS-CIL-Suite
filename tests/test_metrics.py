@@ -1,4 +1,4 @@
-"""Test evaluation metrics and BWT/FWT conventions."""
+"""Test evaluation metrics and BWT/Plasticity conventions."""
 import numpy as np
 import pytest
 from benchmark.eval.metrics import (
@@ -55,11 +55,11 @@ def test_bwt_zero_no_forgetting():
     assert br.bwt == 0.0
 
 
-def test_fwt_is_first_task_aa():
-    """FWT should be the mean first-task AA across datasets."""
+def test_plasticity_is_first_seen_aa():
+    """Plasticity (fwt field) should be the mean first-seen AA across datasets."""
     br = BenchmarkResult(protocol_name="test", method_name="test")
     br.add(TaskResult(task_id=0, per_dataset={"A": 0.85}, avg_aa=0.85, oa=0.85, kappa=0.8))
     br.add(TaskResult(task_id=1, per_dataset={"A": 0.8, "B": 0.7}, avg_aa=0.75, oa=0.75, kappa=0.7))
     br.compute_cl_metrics()
-    # FWT = mean(first_aa_A=0.85, first_aa_B=0.7) = 0.775
+    # plasticity = mean(first_aa_A=0.85, first_aa_B=0.7) = 0.775
     assert br.fwt == pytest.approx(0.775)

@@ -9,7 +9,7 @@ CL metrics (computed over the task sequence):
   Forgetting  — drop from peak accuracy to final accuracy per dataset
   Plasticity  — accuracy on new classes at the task they are introduced
   BWT  — Backward Transfer (average forgetting)
-  FWT  — Forward Transfer (average zero-shot on future tasks)
+  Plasticity (mean) — mean first-seen AA across all datasets
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -52,7 +52,7 @@ class BenchmarkResult:
     forgetting:  Dict[str, float] = field(default_factory=dict)   # per dataset: peak − final (≥0)
     plasticity:  Dict[str, float] = field(default_factory=dict)   # per dataset: AA when first seen
     bwt: float = 0.0    # backward transfer: final − peak (≤0 means forgetting)
-    fwt: float = 0.0    # mean first-task AA (plasticity proxy)
+    fwt: float = 0.0    # mean first-seen AA (plasticity); kept as 'fwt' for backward compat
     final_aa:    float = 0.0
     final_oa:    float = 0.0
     final_kappa: float = 0.0
@@ -102,8 +102,8 @@ class BenchmarkResult:
             f"  Final OA   : {self.final_oa*100:.2f}%",
             f"  Final AA   : {self.final_aa*100:.2f}%",
             f"  Final Kappa: {self.final_kappa:.4f}",
-            f"  BWT : {self.bwt*100:.2f}pp  (negative = forgetting)",
-            f"  FWT : {self.fwt*100:.2f}%   (mean first-task AA)",
+            f"  BWT        : {self.bwt*100:.2f}pp  (negative = forgetting)",
+            f"  Plasticity : {self.fwt*100:.2f}%   (mean first-seen AA)",
         ]
         for ds, f in self.forgetting.items():
             pl = self.plasticity.get(ds, 0.0)

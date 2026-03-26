@@ -9,26 +9,47 @@ from sklearn.decomposition import PCA
 
 # ── PCA ───────────────────────────────────────────────────────────
 
-def apply_pca(X: np.ndarray, n_components: int) -> np.ndarray:
+def apply_pca(X: np.ndarray, n_components: int,
+              train_mask: np.ndarray | None = None) -> np.ndarray:
     """Apply PCA whitening to (H, W, C) hyperspectral cube.
+
+    If ``train_mask`` is provided (H, W bool), PCA is fitted only on
+    the pixels where mask is True, then applied to the full scene.
+    This avoids test-distribution leakage in benchmark settings.
+
     Returns (H, W, n_components).
     """
     H, W, C = X.shape
     n_components = min(n_components, C, H * W)
     flat = X.reshape(-1, C)
+
     pca = PCA(n_components=n_components, whiten=True, random_state=42)
-    reduced = pca.fit_transform(flat)
+    if train_mask is not None:
+        flat_mask = train_mask.reshape(-1)
+        pca.fit(flat[flat_mask])
+    else:
+        pca.fit(flat)
+
+    reduced = pca.transform(flat)
     return reduced.reshape(H, W, n_components)
 
 
 # ── Per-band min-max normalisation ───────────────────────────────
 
-def normalize(data: np.ndarray) -> np.ndarray:
-    """Min-max normalise each channel independently. (H, W, C) → (H, W, C)."""
+def normalize(data: np.ndarray, train_mask: np.ndarray | None = None) -> np.ndarray:
+    """Min-max normalise each channel independently. (H, W, C) → (H, W, C).
+
+    If ``train_mask`` is provided (H, W bool), min/max are computed from
+    train pixels only to avoid test-distribution leakage.
+    """
     out = np.zeros_like(data, dtype=np.float32)
     for i in range(data.shape[2]):
-        lo, hi = data[:, :, i].min(), data[:, :, i].max()
-        out[:, :, i] = 0.0 if hi == lo else (data[:, :, i] - lo) / (hi - lo)
+        ch = data[:, :, i]
+        if train_mask is not None:
+            lo, hi = ch[train_mask].min(), ch[train_mask].max()
+        else:
+            lo, hi = ch.min(), ch.max()
+        out[:, :, i] = 0.0 if hi == lo else (ch - lo) / (hi - lo)
     return out
 
 
@@ -167,12 +188,16 @@ def preprocess_hsi_lidar(
     if lidar.ndim == 2:
         lidar = lidar[:, :, np.newaxis]
 
-    # PCA on HSI
-    hsi_pca = apply_pca(hsi, pca_components)
+    # Train pixel mask: fit PCA and normalization only on training pixels
+    # to avoid test-distribution leakage
+    train_mask = tr_map > 0  # (H, W) bool
 
-    # Normalise
-    hsi_norm   = normalize(hsi_pca)
-    lidar_norm = normalize(lidar.astype(np.float32))
+    # PCA on HSI (fitted on train pixels only)
+    hsi_pca = apply_pca(hsi, pca_components, train_mask=train_mask)
+
+    # Normalise (stats from train pixels only)
+    hsi_norm   = normalize(hsi_pca, train_mask=train_mask)
+    lidar_norm = normalize(lidar.astype(np.float32), train_mask=train_mask)
 
     # Mirror pad
     pad = patch // 2

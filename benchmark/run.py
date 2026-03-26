@@ -668,7 +668,7 @@ def _run_from_args(args):
         print(f"  AA:  {aa*100:.2f} ± {aa_std*100:.2f}%")
         print(f"  κ:   {kap:.4f}")
         print(f"  BWT: {bwt*100:.2f}pp")
-        print(f"  FWT: {fwt*100:.2f}%")
+        print(f"  Plasticity: {fwt*100:.2f}%")
         if args.output:
             out = Path(args.output)
             out.parent.mkdir(parents=True, exist_ok=True)
