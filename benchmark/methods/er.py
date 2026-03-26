@@ -91,15 +91,18 @@ class ER(CILMethod):
                         loss += F.cross_entropy(b_logits[valid][:, cids],
                                                 bmapped[valid])
 
-                # Store in buffer
-                with torch.no_grad():
-                    self._reservoir_add(xh, xl, y)
-
                 opt.zero_grad(); loss.backward(); opt.step()
                 total += loss.item(); n += 1
 
             if (ep + 1) % 10 == 0:
                 print(f"    [ER] Epoch {ep+1}/{self.epochs}  loss={total/n:.4f}")
+
+    def after_task(self, task: Task, train_loader: DataLoader):
+        # Update reservoir once per task (not per batch) to avoid
+        # inflating _n_seen and duplicating samples across epochs
+        with torch.no_grad():
+            for xh, xl, y in train_loader:
+                self._reservoir_add(xh, xl, y)
 
     # ── Inference ─────────────────────────────────────────────────
 

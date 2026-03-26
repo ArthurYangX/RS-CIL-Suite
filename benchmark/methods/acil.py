@@ -84,15 +84,16 @@ class ACIL(CILMethod):
         FtY = F_mat.t() @ Y                 # (d, num_classes)
 
         if self._R is None:
-            # First task: initialise
+            # First task: initialise with ridge regularisation
             A = FtF + self.ridge * torch.eye(self.d)
             self._R   = torch.linalg.inv(A)
             self._FtY = FtY
         else:
-            # Recursive update: R_new = (A_old^{-1} + FtF + λI)^{-1}
-            # Re-add ridge to keep the accumulated system well-conditioned
+            # Recursive update: R_new = (A_old_inv + FtF_new)^{-1}
+            # Ridge was already added in the first task's A; do NOT
+            # re-add it here (that would double/triple the regularisation)
             A_new = torch.linalg.inv(
-                torch.linalg.inv(self._R) + FtF + self.ridge * torch.eye(self.d)
+                torch.linalg.inv(self._R) + FtF
             )
             self._R   = A_new
             self._FtY = self._FtY + FtY

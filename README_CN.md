@@ -339,7 +339,7 @@ python benchmark/run.py --method my_method --protocol B1 --data_root ~/data
 | `herding` | 否 | 迭代最近均值选择（iCaRL 默认） |
 | `closest` | 否 | 非迭代最近均值（更快的 herding 替代） |
 | `k_center` | 否 | 贪心核心集（最大化最小距离覆盖） |
-| `entropy` | 否 | 选择不确定性最高的样本 |
+| `entropy` | 否 | 选择特征空间中不确定性最高的样本（距类均值最远） |
 | `kmeans` | 否 | K-Means++ 聚类，每个簇中心选一个样本 |
 | `random` | 是 | 均匀随机采样 |
 | `reservoir` | 是 | 类别平衡的蓄水池采样（在线） |

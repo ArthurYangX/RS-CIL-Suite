@@ -340,7 +340,7 @@ Replay methods share a pluggable `ExemplarMemory` with 8 strategies:
 | `herding` | No | Iterative closest-to-mean (iCaRL default) |
 | `closest` | No | Non-iterative closest-to-mean |
 | `k_center` | No | Greedy coreset (max min-distance) |
-| `entropy` | No | Highest-uncertainty samples |
+| `entropy` | No | Highest feature-space uncertainty (distance from class mean) |
 | `kmeans` | No | K-Means++ clustering |
 | `random` | Yes | Uniform random |
 | `reservoir` | Yes | Class-balanced reservoir sampling |

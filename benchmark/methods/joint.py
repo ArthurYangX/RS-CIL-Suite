@@ -24,6 +24,9 @@ class JointTraining(CILMethod):
                  backbone="simple_encoder", d=128, epochs=50, lr=1e-3, **kwargs):
         encoder = build_backbone(backbone, hsi_ch=hsi_channels, lidar_ch=lidar_channels, d=d)
         super().__init__(encoder, device, num_classes)
+        self.hsi_channels = hsi_channels
+        self.lidar_channels = lidar_channels
+        self.backbone_name = backbone
         self.d = d
         self.epochs = epochs
         self.lr = lr
@@ -35,6 +38,13 @@ class JointTraining(CILMethod):
         self._all_datasets.append(train_loader.dataset)
         joint_ds = ConcatDataset(self._all_datasets)
         joint_loader = DataLoader(joint_ds, batch_size=256, shuffle=True, num_workers=0)
+
+        # Reinitialize model and head from scratch (true oracle upper bound)
+        self.model = build_backbone(
+            self.backbone_name, hsi_ch=self.hsi_channels,
+            lidar_ch=self.lidar_channels, d=self.d
+        ).to(self.device)
+        self.head = nn.Linear(self.d, self.num_classes_total).to(self.device)
 
         self.model.train(); self.head.train()
         params = list(self.model.parameters()) + list(self.head.parameters())
