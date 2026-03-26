@@ -219,6 +219,20 @@ python benchmark/run.py --protocol configs/protocols/my_protocol.yaml \
 
 Ground Truth + 每个任务后的预测图，使用精确像素坐标。支持多方法并排对比。
 
+<p align="center">
+  <img src="assets/icarl_A_IndianPines_maps_per_task.png" width="95%" alt="iCaRL IndianPines 分类图">
+</p>
+<p align="center">
+  <em>iCaRL 在 A_IndianPines 上的表现（16 类，4 个任务）：分类图从 95.1% 退化到 61.4%，误分类区域随任务增加明显增大。</em>
+</p>
+
+<p align="center">
+  <img src="assets/icarl_A_Trento_maps_per_task.png" width="95%" alt="iCaRL Trento 分类图">
+</p>
+<p align="center">
+  <em>iCaRL 在 A_Trento 上的表现（6 类，3 个任务）：OA 从 100% 降至 89%。</em>
+</p>
+
 ```bash
 # 生成全部图表
 python benchmark/run.py --protocol A_IndianPines --method icarl \

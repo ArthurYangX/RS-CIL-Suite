@@ -220,6 +220,20 @@ Three lines decomposing OA over the task sequence: mean over all seen tasks, mea
 
 Ground truth + prediction map after each task, using exact pixel coordinates. Supports multi-method side-by-side comparison.
 
+<p align="center">
+  <img src="assets/icarl_A_IndianPines_maps_per_task.png" width="95%" alt="iCaRL classification maps on IndianPines">
+</p>
+<p align="center">
+  <em>iCaRL on A_IndianPines (16 classes, 4 tasks): classification maps degrade from 95.1% to 61.4% as new classes arrive. Misclassified regions grow visibly across tasks.</em>
+</p>
+
+<p align="center">
+  <img src="assets/icarl_A_Trento_maps_per_task.png" width="95%" alt="iCaRL classification maps on Trento">
+</p>
+<p align="center">
+  <em>iCaRL on A_Trento (6 classes, 3 tasks): OA drops from 100% to 89% by the final task.</em>
+</p>
+
 ```bash
 # Generate all figures
 python benchmark/run.py --protocol A_IndianPines --method icarl \
