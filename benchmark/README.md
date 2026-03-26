@@ -390,8 +390,8 @@ tests/                    # 64 unit tests
 ## Citation
 
 ```bibtex
-@misc{yang2026rscilbench,
-    author       = {Yang, Xiao},
+@misc{yang2026rscilsuite,
+    author       = {Yang, Junchao},
     title        = {RS-CIL-Suite: A Standardized Class-Incremental Learning Suite for Remote Sensing Hyperspectral Imagery},
     year         = {2026},
     organization = {GitHub},

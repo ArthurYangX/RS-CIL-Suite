@@ -389,9 +389,9 @@ tests/                    # 64 个单元测试
 ## 引用
 
 ```bibtex
-@misc{yang2026rscilbench,
-    author       = {Yang, Xiao},
-    title        = {RS-CIL-Suite: A Standardized Class-Incremental Learning Benchmark for Remote Sensing Hyperspectral Imagery},
+@misc{yang2026rscilsuite,
+    author       = {Yang, Junchao},
+    title        = {RS-CIL-Suite: A Standardized Class-Incremental Learning Suite for Remote Sensing Hyperspectral Imagery},
     year         = {2026},
     organization = {GitHub},
     url          = {https://github.com/ArthurYangX/RS-CIL-Suite},
