@@ -16,11 +16,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/方法-15-blue" alt="Methods">
+  <img src="https://img.shields.io/badge/方法-17-blue" alt="Methods">
   <img src="https://img.shields.io/badge/数据集-10-green" alt="Datasets">
   <img src="https://img.shields.io/badge/协议-15%2B-orange" alt="Protocols">
   <img src="https://img.shields.io/badge/骨干网络-5-purple" alt="Backbones">
-  <img src="https://img.shields.io/badge/测试-64%20通过-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/测试-66%20通过-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python">
 </p>
 
@@ -29,14 +29,14 @@
 ## 核心特性
 
 - **10 个公开 HSI 数据集** — 自动下载与预处理（PCA、归一化、patch 提取）
-- **15 种类增量学习方法** — 覆盖正则化、回放、蒸馏、解析、梯度投影五大类
+- **17 种类增量学习方法** — 覆盖正则化、回放、蒸馏、解析、梯度投影五大类
 - **5 种骨干网络** — 从轻量 CNN（0.1M）到 ViT-Small（10.7M）
 - **15 个内置评估协议**（场景内 + 跨场景）+ 自定义 YAML 协议
 - **8 种样本选择策略**（herding、k-center、entropy、k-means 等）
 - **任务感知评估** — 保存精确空间坐标，支持分类图可视化
 - **论文级可视化** — 任务精度矩阵、反馈曲线、HyperKD 风格分类图
 - **YAML 配置系统** — 支持 CLI 覆盖、wandb 集成、断点续训
-- **64 个单元测试** + GitHub Actions CI
+- **66 个单元测试** + GitHub Actions CI
 
 ---
 
@@ -82,9 +82,9 @@ python benchmark/compare.py results/ --latex
 | [WHU-Hi-LongKou](https://huggingface.co/datasets/danaroth/whu_hi) | 无人机 HSI | 9 | 550 x 400 x 270 | -- |
 
 预处理流程（仅首次运行，结果自动缓存）：
-`原始 .mat` &rarr; PCA（默认 36 波段）&rarr; 归一化 &rarr; 镜像填充 &rarr; patch 提取（默认 7x7）&rarr; `.npz` 缓存
+`原始 .mat` &rarr; PCA（默认 36 波段，仅在训练像素上拟合）&rarr; 归一化（训练像素统计量）&rarr; 镜像填充 &rarr; patch 提取（默认 7x7）&rarr; `.npz` 缓存
 
-Patch 尺寸和 PCA 维度可通过 `--patch_size` 和 `--pca_components` 自定义。
+PCA 和归一化仅基于训练像素拟合，避免测试分布泄露。Patch 尺寸和 PCA 维度可通过 `--patch_size` 和 `--pca_components` 自定义。
 
 ---
 
@@ -100,6 +100,8 @@ Patch 尺寸和 PCA 维度可通过 `--patch_size` 和 `--pca_components` 自定
 | `lwf` | 知识蒸馏 | -- | LwF (Li & Hoiem, ECCV 2016) |
 | `gpm` | 梯度投影 | -- | GPM (Saha et al., NeurIPS 2021) |
 | `acil` | 解析学习 | -- | ACIL (Zhuang et al., NeurIPS 2022) |
+| `er` | 回放 | Yes | Experience Replay（基础回放基线） |
+| `er_ace` | 回放 + 非对称 CE | Yes | ER-ACE (Caccia et al., ICLR 2022) |
 | `icarl` | 回放 + 蒸馏 | Yes | iCaRL (Rebuffi et al., CVPR 2017) |
 | `lucir` | 回放 + 余弦分类器 | Yes | LUCIR (Hou et al., CVPR 2019) |
 | `bic` | 回放 + 偏差校正 | Yes | BiC (Wu et al., CVPR 2019) |
@@ -366,12 +368,12 @@ python benchmark/infer.py \
 
 ```
 benchmark/
-├── configs/              # YAML 配置（默认 + 15 个方法配置 + 自定义协议）
+├── configs/              # YAML 配置（默认 + 17 个方法配置 + 自定义协议）
 ├── models/               # 骨干网络注册表（SimpleEncoder、ResNet、ViT）
 ├── datasets/             # 10 个数据集加载器 + 预处理流水线
-├── methods/              # 15 种 CIL 方法 + 基类 + 模板
+├── methods/              # 17 种 CIL 方法 + 基类 + 模板
 ├── protocols/            # 15 个内置协议 + YAML 加载器
-├── eval/                 # 评估指标（OA/AA/Kappa/BWT/FWT）+ 14 个绘图函数 + 调色板
+├── eval/                 # 评估指标（OA/AA/Kappa/BWT/Plasticity）+ 14 个绘图函数 + 调色板
 ├── utils/                # ExemplarMemory、优化器、调度器
 ├── config.py             # YAML 配置加载器（支持 CLI 合并）
 ├── download.py           # 数据集自动下载器

@@ -17,11 +17,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Methods-15-blue" alt="Methods">
+  <img src="https://img.shields.io/badge/Methods-17-blue" alt="Methods">
   <img src="https://img.shields.io/badge/Datasets-10-green" alt="Datasets">
   <img src="https://img.shields.io/badge/Protocols-15%2B-orange" alt="Protocols">
   <img src="https://img.shields.io/badge/Backbones-5-purple" alt="Backbones">
-  <img src="https://img.shields.io/badge/Tests-64%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-66%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python">
 </p>
 
@@ -30,14 +30,14 @@
 ## Key Features
 
 - **10 public HSI datasets** with automatic download and preprocessing (PCA, normalization, patch extraction)
-- **15 CIL methods** spanning regularization, replay, distillation, analytic, and gradient-projection families
+- **17 CIL methods** spanning regularization, replay, distillation, analytic, and gradient-projection families
 - **5 backbone architectures** — from lightweight CNN (0.1M) to ViT-Small (10.7M)
 - **15 built-in evaluation protocols** (within-scene + cross-scene) and custom YAML protocol support
 - **8 exemplar selection strategies** (herding, k-center, entropy, k-means, etc.)
 - **Task-aware evaluation** with exact spatial coordinates for classification map visualization
 - **Publication-quality figures** — task accuracy matrices, feedback curves, HyperKD-style map grids
 - **YAML config system** with CLI overrides, wandb integration, and checkpoint/resume support
-- **64 unit tests** with GitHub Actions CI
+- **66 unit tests** with GitHub Actions CI
 
 ---
 
@@ -83,9 +83,9 @@ All 10 datasets download automatically via `download.py` (no registration requir
 | [WHU-Hi-LongKou](https://huggingface.co/datasets/danaroth/whu_hi) | UAV HSI | 9 | 550 x 400 x 270 | -- |
 
 Each dataset is preprocessed once and cached:
-`raw .mat` &rarr; PCA (default 36 bands) &rarr; normalize &rarr; mirror pad &rarr; patch extraction (default 7x7) &rarr; `.npz` cache
+`raw .mat` &rarr; PCA (default 36 bands, fitted on train pixels only) &rarr; normalize (train-pixel stats) &rarr; mirror pad &rarr; patch extraction (default 7x7) &rarr; `.npz` cache
 
-Patch size and PCA components are configurable via `--patch_size` and `--pca_components`.
+PCA and normalization are fitted exclusively on training pixels to avoid test-distribution leakage. Patch size and PCA components are configurable via `--patch_size` and `--pca_components`.
 
 ---
 
@@ -101,6 +101,8 @@ Patch size and PCA components are configurable via `--patch_size` and `--pca_com
 | `lwf` | Distillation | -- | LwF (Li & Hoiem, ECCV 2016) |
 | `gpm` | Gradient projection | -- | GPM (Saha et al., NeurIPS 2021) |
 | `acil` | Analytic | -- | ACIL (Zhuang et al., NeurIPS 2022) |
+| `er` | Replay | Yes | Experience Replay (baseline) |
+| `er_ace` | Replay + asymmetric CE | Yes | ER-ACE (Caccia et al., ICLR 2022) |
 | `icarl` | Replay + distill | Yes | iCaRL (Rebuffi et al., CVPR 2017) |
 | `lucir` | Replay + cosine | Yes | LUCIR (Hou et al., CVPR 2019) |
 | `bic` | Replay + bias corr. | Yes | BiC (Wu et al., CVPR 2019) |
@@ -367,12 +369,12 @@ python benchmark/infer.py \
 
 ```
 benchmark/
-├── configs/              # YAML configs (defaults + 15 per-method + custom protocols)
+├── configs/              # YAML configs (defaults + 17 per-method + custom protocols)
 ├── models/               # Backbone registry (SimpleEncoder, ResNet, ViT)
 ├── datasets/             # 10 dataset loaders + preprocessing pipeline
-├── methods/              # 15 CIL methods + base class + template
+├── methods/              # 17 CIL methods + base class + template
 ├── protocols/            # 15 built-in protocols + YAML loader
-├── eval/                 # Metrics (OA/AA/Kappa/BWT/FWT) + 14 plot functions + color palettes
+├── eval/                 # Metrics (OA/AA/Kappa/BWT/Plasticity) + 14 plot functions + color palettes
 ├── utils/                # ExemplarMemory, optimizers, schedulers
 ├── config.py             # YAML config loader with CLI merge
 ├── download.py           # Dataset auto-downloader
