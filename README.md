@@ -6,6 +6,7 @@
 </p>
 
 <p align="center">
+  <a href="./README_CN.md">中文</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#datasets">Datasets</a> &bull;
   <a href="#methods">Methods</a> &bull;

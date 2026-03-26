@@ -90,3 +90,4 @@ paper/
 *.tex
 *.aux
 *.pdf
+!README_CN.md
