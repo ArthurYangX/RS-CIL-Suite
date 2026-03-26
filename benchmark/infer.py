@@ -102,12 +102,26 @@ def main():
     _cli_defaults = {"patch_size": 7, "pca_components": 36}
 
     if run_meta:
-        # Validate protocol and method match
-        if "protocol" in run_meta and run_meta["protocol"] != args.protocol:
-            raise ValueError(
-                f"CLI --protocol={args.protocol} does not match checkpoint "
-                f"protocol={run_meta['protocol']}. Use the same protocol "
-                f"that was used during training.")
+        # Validate protocol match (compare task definitions, not raw strings,
+        # since the same protocol can be referenced as "B1", "configs/protocols/b1.yaml", etc.)
+        if "protocol_tasks" in run_meta:
+            ckpt_tasks = run_meta["protocol_tasks"]
+            cli_tasks = [
+                {"task_id": t.task_id, "dataset": t.dataset_name,
+                 "class_ids": t.class_ids, "global_class_ids": t.global_class_ids}
+                for t in protocol.tasks
+            ]
+            if ckpt_tasks != cli_tasks:
+                raise ValueError(
+                    f"Protocol task definitions from checkpoint do not match "
+                    f"--protocol={args.protocol}. The checkpoint was trained "
+                    f"with protocol='{run_meta.get('protocol', '?')}' "
+                    f"({len(ckpt_tasks)} tasks). Cannot evaluate on a "
+                    f"different task sequence.")
+        elif "protocol" in run_meta and run_meta["protocol"] != args.protocol:
+            # Fallback for old checkpoints without protocol_tasks
+            print(f"[WARN] CLI --protocol={args.protocol} differs from "
+                  f"checkpoint protocol={run_meta['protocol']}")
         if "method" in run_meta and run_meta["method"] != args.method:
             raise ValueError(
                 f"CLI --method={args.method} does not match checkpoint "
@@ -160,16 +174,19 @@ def main():
                          f"Available: {sorted(registry)}")
 
     # Prefer checkpoint's saved config; fall back to loading from disk.
-    # CLI --opts and --config deep-merge on top (not shallow replace).
-    from benchmark.config import _deep_merge
+    # CLI --opts apply only the explicit keys on top, NOT the full
+    # defaults+method YAML stack (which would clobber checkpoint values).
+    from benchmark.config import _deep_merge, _apply_overrides, _load_yaml
     if run_meta.get("config"):
         cfg = run_meta["config"]
         print(f"[INFO] Using config from checkpoint run_meta")
-        # Deep-merge CLI overrides on top of checkpoint config
-        if args.opts or args.config:
-            cli_cfg = load_config(args.method, config_path=args.config,
-                                  cli_overrides=args.opts)
-            cfg = _deep_merge(cfg, cli_cfg)
+        # --config: deep-merge only the explicit YAML file
+        if args.config:
+            cli_yaml = _load_yaml(Path(args.config))
+            cfg = _deep_merge(cfg, cli_yaml)
+        # --opts: apply only the explicit key=value overrides
+        if args.opts:
+            cfg = _apply_overrides(cfg, args.opts)
     else:
         cfg = load_config(args.method, config_path=args.config,
                           cli_overrides=args.opts)
