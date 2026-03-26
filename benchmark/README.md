@@ -203,7 +203,7 @@ benchmark/
 │   └── colors.py           # Color palettes for all 10 datasets
 ├── utils/
 │   ├── training.py         # build_optimizer, build_scheduler, remap_labels
-│   └── exemplars.py        # Shared ExemplarMemory (herding / random / k-center)
+│   └── exemplars.py        # Shared ExemplarMemory (8 selection strategies)
 ├── config.py               # YAML config loader (defaults ← method ← CLI)
 ├── download.py             # Dataset downloader
 ├── run.py                  # Experiment runner (config, checkpoints, wandb)
@@ -379,6 +379,64 @@ self._log({"train/loss": loss, "epoch": ep, "task_id": task.task_id})
 ```
 
 See `methods/_template.py` for a complete runnable example.
+
+---
+
+## Exemplar Selection Strategies
+
+Replay-based methods (iCaRL, LUCIR, PODNet, WA, DER++, BiC, GDumb) use exemplar memory to store a subset of old-task data. The benchmark provides **8 selection strategies** via the shared `ExemplarMemory` module — switch with one line in YAML or CLI:
+
+```bash
+# CLI override
+python benchmark/run.py --method wa --protocol B1 --data_root ~/data \
+    --opts method.exemplar_strategy=entropy
+
+# Or in YAML config
+# configs/wa.yaml
+# method:
+#   exemplar_strategy: kmeans
+```
+
+| Strategy | Needs Model | Speed | Description |
+|----------|:-----------:|:-----:|-------------|
+| `herding` | Yes | Medium | Iterative closest-to-mean in feature space (iCaRL default) |
+| `closest` | Yes | Fast | Non-iterative closest-to-mean (faster herding alternative) |
+| `random` | No | Fast | Uniform random sampling |
+| `k_center` | Yes | Medium | Greedy coreset — maximise min-distance coverage |
+| `entropy` | Yes | Fast | Select highest-entropy (most uncertain) samples |
+| `kmeans` | Yes | Medium | K-Means++ clustering — one sample per centroid |
+| `reservoir` | No | Fast | Class-balanced reservoir sampling (online) |
+| `ring` | No | Fast | FIFO ring buffer per class |
+
+**Usage in your own method:**
+
+```python
+from benchmark.utils.exemplars import ExemplarMemory, list_strategies
+
+# See all available strategies
+print(list_strategies())
+
+# Create memory with any strategy
+memory = ExemplarMemory(budget=2000, strategy="herding")
+
+# Update after each task (selects exemplars for new classes, trims old ones)
+memory.update(self.model, hsi, lidar, labels, device,
+              new_class_ids=task.global_class_ids)
+
+# Get replay data
+replay_loader = memory.get_loader(batch_size=64)
+hsi, lidar, labels = memory.get_data()  # raw tensors
+
+# Checkpoint support
+state = memory.state_dict()    # save
+memory.load_state_dict(state)  # restore
+```
+
+Also update the file structure entry:
+
+```
+└── exemplars.py        # Shared ExemplarMemory (8 strategies)
+```
 
 ---
 
