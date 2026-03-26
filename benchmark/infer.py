@@ -98,20 +98,23 @@ def main():
     _pca_components = args.pca_components
     _backbone = None
 
+    # CLI default sentinels (must match _build_parser defaults)
+    _cli_defaults = {"patch_size": 7, "pca_components": 36}
+
     if run_meta:
-        # Use checkpoint values as defaults when CLI is at default
-        if args.patch_size == 7 and "patch_size" in run_meta:
+        # Use checkpoint values as defaults when CLI is at its default
+        if args.patch_size == _cli_defaults["patch_size"] and "patch_size" in run_meta:
             _patch_size = run_meta["patch_size"]
-        if args.pca_components == 36 and "pca_components" in run_meta:
+        if args.pca_components == _cli_defaults["pca_components"] and "pca_components" in run_meta:
             _pca_components = run_meta["pca_components"]
         if "backbone" in run_meta:
             _backbone = run_meta["backbone"]
-        # Warn on mismatch
-        for key, cli_val, meta_val in [
-            ("patch_size", args.patch_size, run_meta.get("patch_size")),
-            ("pca_components", args.pca_components, run_meta.get("pca_components")),
+        # Warn on mismatch (only when CLI was explicitly set to non-default)
+        for key, cli_val, meta_val, default in [
+            ("patch_size", args.patch_size, run_meta.get("patch_size"), _cli_defaults["patch_size"]),
+            ("pca_components", args.pca_components, run_meta.get("pca_components"), _cli_defaults["pca_components"]),
         ]:
-            if meta_val is not None and cli_val != 7 and cli_val != 36 and cli_val != meta_val:
+            if meta_val is not None and cli_val != default and cli_val != meta_val:
                 print(f"[WARN] CLI --{key}={cli_val} differs from "
                       f"checkpoint run_meta {key}={meta_val}")
 
@@ -144,10 +147,15 @@ def main():
                       cli_overrides=args.opts)
     flat_cfg = flatten_config(cfg)
 
-    # Map config key to method kwarg; checkpoint backbone takes priority
+    # Map config key to method kwarg
     if "_backbone" in flat_cfg:
         flat_cfg["backbone"] = flat_cfg.pop("_backbone")
-    if _backbone and "backbone" not in flat_cfg:
+    # Checkpoint backbone overrides config default (config always has
+    # simple_encoder from defaults.yaml, so "not in" never triggers)
+    if _backbone:
+        if flat_cfg.get("backbone") != _backbone:
+            print(f"[INFO] Using backbone '{_backbone}' from checkpoint "
+                  f"(config had '{flat_cfg.get('backbone', 'N/A')}')")
         flat_cfg["backbone"] = _backbone
 
     hsi_ch = _pca_components
