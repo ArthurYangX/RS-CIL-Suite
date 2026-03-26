@@ -30,6 +30,8 @@ class PatchDataset(Dataset):
       hsi_patch   : (C_hsi, H, W) float32  — may be zeros if no HSI
       lidar_patch : (C_lid, H, W) float32  — may be zeros if no LiDAR
       label       : int64  (0-indexed)
+      coords      : (row, col) exact spatial coordinate in the original scene
+                    (stored on the dataset object, not returned by __getitem__)
     """
 
     def __init__(
@@ -37,10 +39,13 @@ class PatchDataset(Dataset):
         hsi: np.ndarray,       # (N, C, H, W)
         lidar: np.ndarray,     # (N, C, H, W)
         labels: np.ndarray,    # (N,)
+        coords: np.ndarray | None = None,  # (N, 2), exact (row, col)
     ):
         self.hsi    = torch.from_numpy(hsi).float()
         self.lidar  = torch.from_numpy(lidar).float()
         self.labels = torch.from_numpy(labels).long()
+        self.coords = (torch.from_numpy(coords).long()
+                       if coords is not None else None)
 
     def __len__(self) -> int:
         return len(self.labels)
@@ -59,6 +64,7 @@ class PatchDataset(Dataset):
         new.hsi    = self.hsi
         new.lidar  = torch.cat([self.lidar, pad], dim=1)
         new.labels = self.labels
+        new.coords = self.coords
         return new
 
     def subset(self, class_ids: List[int]) -> "PatchDataset":
@@ -71,6 +77,7 @@ class PatchDataset(Dataset):
         new.hsi    = self.hsi[idx]
         new.lidar  = self.lidar[idx]
         new.labels = self.labels[idx]
+        new.coords = self.coords[idx] if self.coords is not None else None
         return new
 
 
@@ -146,39 +153,64 @@ class RSDataset(ABC):
     # ── Internal ──────────────────────────────────────────────────
 
     def _load_and_cache(self) -> Tuple[PatchDataset, PatchDataset]:
-        import hashlib, os
+        import hashlib
         cache_dir = self.root / ".cache"
         cache_dir.mkdir(exist_ok=True)
         key = hashlib.md5(
-            f"pca{self.pca_components}_patch{self.patch_size}_tr{self.train_ratio}".encode()
+            (
+                f"pca{self.pca_components}_patch{self.patch_size}_"
+                f"tr{self.train_ratio}_coordsv1"
+            ).encode()
         ).hexdigest()[:12]
         cache_file = cache_dir / f"benchmark_{key}.npz"
 
         if cache_file.exists():
             print(f"[CACHE] {self.INFO.name}: loading from {cache_file}")
             d = np.load(cache_file, allow_pickle=False)
-            train_ds = PatchDataset(d["x_train_hsi"], d["x_train_lidar"], d["y_train"])
-            test_ds  = PatchDataset(d["x_test_hsi"],  d["x_test_lidar"],  d["y_test"])
+            train_coords = d["coords_train"] if "coords_train" in d else None
+            test_coords = d["coords_test"] if "coords_test" in d else None
+            train_ds = PatchDataset(
+                d["x_train_hsi"], d["x_train_lidar"], d["y_train"], train_coords
+            )
+            test_ds = PatchDataset(
+                d["x_test_hsi"], d["x_test_lidar"], d["y_test"], test_coords
+            )
             return train_ds, test_ds
 
         print(f"[LOAD] {self.INFO.name}: preprocessing from {self.root}")
-        x_tr_hsi, x_tr_lid, y_tr, x_te_hsi, x_te_lid, y_te = self._preprocess()
+        (
+            x_tr_hsi,
+            x_tr_lid,
+            y_tr,
+            coords_tr,
+            x_te_hsi,
+            x_te_lid,
+            y_te,
+            coords_te,
+        ) = self._preprocess()
 
         np.savez_compressed(
             cache_file,
             x_train_hsi=x_tr_hsi, x_train_lidar=x_tr_lid, y_train=y_tr,
+            coords_train=coords_tr,
             x_test_hsi=x_te_hsi,  x_test_lidar=x_te_lid,  y_test=y_te,
+            coords_test=coords_te,
         )
         print(f"[CACHE] {self.INFO.name}: saved to {cache_file}")
 
-        train_ds = PatchDataset(x_tr_hsi, x_tr_lid, y_tr)
-        test_ds  = PatchDataset(x_te_hsi, x_te_lid, y_te)
+        train_ds = PatchDataset(x_tr_hsi, x_tr_lid, y_tr, coords_tr)
+        test_ds  = PatchDataset(x_te_hsi, x_te_lid, y_te, coords_te)
         return train_ds, test_ds
 
     @abstractmethod
     def _preprocess(self) -> Tuple[
-        np.ndarray, np.ndarray, np.ndarray,  # train hsi, lidar, labels
-        np.ndarray, np.ndarray, np.ndarray,  # test  hsi, lidar, labels
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray,  # train hsi, lidar, labels, coords
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray,  # test  hsi, lidar, labels, coords
     ]:
-        """Load raw data, apply PCA + normalisation + patch extraction."""
+        """Load raw data, apply PCA + normalisation + patch extraction.
+
+        Returns exact per-sample coordinates so downstream evaluation can
+        generate task-aware spatial visualizations without reconstructing
+        coordinates from labels.
+        """
         ...

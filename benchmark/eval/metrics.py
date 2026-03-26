@@ -29,11 +29,24 @@ class TaskResult:
 
 
 @dataclass
+class TaskFeedbackResult:
+    """Task-aware evaluation result for one (after_task, eval_task) pair."""
+    after_task_id: int
+    eval_task_id: int
+    dataset_name: str
+    oa: float
+    aa: float
+    kappa: float
+    num_samples: int = 0
+
+
+@dataclass
 class BenchmarkResult:
     """Accumulated results over the full CIL sequence."""
     protocol_name: str
     method_name: str
     task_results: List[TaskResult] = field(default_factory=list)
+    task_feedback: List[TaskFeedbackResult] = field(default_factory=list)
 
     # Derived (filled by compute_cl_metrics)
     forgetting:  Dict[str, float] = field(default_factory=dict)   # per dataset: peak − final (≥0)
@@ -53,6 +66,9 @@ class BenchmarkResult:
             if ds not in self._first_aa:
                 self._first_aa[ds] = aa
         self.task_results.append(result)
+
+    def add_task_feedback(self, result: TaskFeedbackResult):
+        self.task_feedback.append(result)
 
     def compute_cl_metrics(self):
         if not self.task_results:

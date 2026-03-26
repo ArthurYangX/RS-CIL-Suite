@@ -151,14 +151,17 @@ def preprocess_hsi_lidar(
     num_classes: int,
     patch: int = 7,
     pca_components: int = 36,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray,
-           np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+]:
     """Full preprocessing pipeline used by all HSI+LiDAR datasets.
 
     Returns:
-        x_train_hsi, x_train_lidar, y_train,
-        x_test_hsi,  x_test_lidar,  y_test
-    All arrays are numpy, labels are 0-indexed.
+        x_train_hsi, x_train_lidar, y_train, coords_train,
+        x_test_hsi,  x_test_lidar,  y_test,  coords_test
+    All arrays are numpy, labels are 0-indexed, coords are exact (row, col)
+    locations in the original unpadded scene.
     """
     # Ensure LiDAR is 3-D
     if lidar.ndim == 2:
@@ -186,4 +189,4 @@ def preprocess_hsi_lidar(
     x_te_hsi, x_te_lid  = extract_patches(hsi_pad, lidar_pad, te_coords, patch)
     y_te = build_labels(te_counts)
 
-    return x_tr_hsi, x_tr_lid, y_tr, x_te_hsi, x_te_lid, y_te
+    return x_tr_hsi, x_tr_lid, y_tr, tr_coords, x_te_hsi, x_te_lid, y_te, te_coords

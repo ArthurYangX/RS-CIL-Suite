@@ -41,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from benchmark.datasets.registry import get_dataset
 from benchmark.protocols.cil import PROTOCOLS, CILProtocol, get_protocol
-from benchmark.eval.metrics import evaluate, BenchmarkResult
+from benchmark.eval.metrics import BenchmarkResult, TaskFeedbackResult, evaluate
 from benchmark.methods import get_method_registry
 from benchmark.config import load_config, flatten_config
 
@@ -59,6 +59,100 @@ def build_class_to_dataset(protocol: CILProtocol) -> dict[int, str]:
         for gid in task.global_class_ids:
             mapping[gid] = task.dataset_name
     return mapping
+
+
+def build_dataset_class_mappings(protocol: CILProtocol, datasets: dict) -> dict[str, dict]:
+    """Return dataset-local/global class mappings for saved plotting artifacts."""
+    mappings: dict[str, dict] = {}
+    for ds_name, ds in datasets.items():
+        local_ids: list[int] = []
+        global_ids: list[int] = []
+        for task in protocol.tasks:
+            if task.dataset_name != ds_name:
+                continue
+            local_ids.extend(task.class_ids)
+            global_ids.extend(task.global_class_ids)
+        pairs = sorted(zip(global_ids, local_ids), key=lambda x: x[0])
+        mappings[ds_name] = {
+            "class_names": list(ds.class_names),
+            "local_class_ids": [local for _, local in pairs],
+            "global_class_ids": [global_id for global_id, _ in pairs],
+        }
+    return mappings
+
+
+def _task_class_names(dataset, class_ids: list[int]) -> list[str]:
+    return [
+        dataset.class_names[c]
+        for c in class_ids
+        if 0 <= c < len(dataset.class_names)
+    ]
+
+
+def _coords_to_numpy(ds) -> np.ndarray | None:
+    coords = getattr(ds, "coords", None)
+    if coords is None:
+        return None
+    return coords.cpu().numpy()
+
+
+def _make_task_eval_artifact(
+    *,
+    after_task_id: int,
+    eval_task,
+    dataset,
+    dataset_mapping: dict,
+    args,
+    preds: np.ndarray,
+    targets: np.ndarray,
+    coords: np.ndarray | None,
+    oa: float,
+    aa: float,
+    kappa: float,
+) -> dict:
+    return {
+        "after_task_id": after_task_id,
+        "eval_task_id": eval_task.task_id,
+        "dataset_name": eval_task.dataset_name,
+        "method_name": args.method,
+        "protocol_name": args.protocol,
+        "seed": args.seed,
+        "oa": oa,
+        "aa": aa,
+        "kappa": kappa,
+        "num_samples": int(len(targets)),
+        "class_names": list(dataset.class_names),
+        "task_class_names": _task_class_names(dataset, eval_task.class_ids),
+        "local_class_ids": list(eval_task.class_ids),
+        "global_class_ids": list(eval_task.global_class_ids),
+        "dataset_local_class_ids": list(dataset_mapping.get("local_class_ids", [])),
+        "dataset_global_class_ids": list(dataset_mapping.get("global_class_ids", [])),
+        "preds": preds.astype(np.int64, copy=False),
+        "targets": targets.astype(np.int64, copy=False),
+        "coords": coords.astype(np.int32, copy=False) if coords is not None else None,
+    }
+
+
+def _split_task_eval_artifacts(task_eval_artifacts: list[dict]) -> tuple[list[dict], dict[str, np.ndarray]]:
+    metadata: list[dict] = []
+    arrays: dict[str, np.ndarray] = {}
+    for idx, artifact in enumerate(task_eval_artifacts):
+        prefix = f"eval_{idx:04d}"
+        arrays[f"{prefix}_preds"] = artifact["preds"]
+        arrays[f"{prefix}_targets"] = artifact["targets"]
+        if artifact["coords"] is not None:
+            arrays[f"{prefix}_coords"] = artifact["coords"]
+
+        meta = {
+            k: v for k, v in artifact.items()
+            if k not in {"preds", "targets", "coords"}
+        }
+        meta["preds_key"] = f"{prefix}_preds"
+        meta["targets_key"] = f"{prefix}_targets"
+        if artifact["coords"] is not None:
+            meta["coords_key"] = f"{prefix}_coords"
+        metadata.append(meta)
+    return metadata, arrays
 
 
 # ── wandb helpers ─────────────────────────────────────────────────
@@ -137,8 +231,14 @@ def _wandb_log_final(wandb_run, result):
         "final_kappa": result.final_kappa,
         "bwt":         result.bwt * 100,
         "fwt":         result.fwt * 100,
-        "forgetting":  result.forgetting * 100,
-        "plasticity":  result.plasticity * 100,
+        "forgetting_mean": (
+            float(np.mean(list(result.forgetting.values()))) * 100
+            if result.forgetting else 0.0
+        ),
+        "plasticity_mean": (
+            float(np.mean(list(result.plasticity.values()))) * 100
+            if result.plasticity else 0.0
+        ),
     })
     wandb_run.finish()
 
@@ -191,6 +291,7 @@ def run(args):
 
     # ── Build class-to-dataset mapping ────────────────────────────
     class_to_dataset = build_class_to_dataset(protocol)
+    dataset_class_mappings = build_dataset_class_mappings(protocol, datasets)
 
     # ── Method ────────────────────────────────────────────────────
     method = _build_method(args.method, protocol, device, datasets, cfg)
@@ -214,6 +315,7 @@ def run(args):
     # ── CIL loop ──────────────────────────────────────────────────
     result = BenchmarkResult(protocol_name=args.protocol, method_name=args.method)
     seen_classes: list[int] = []
+    task_eval_artifacts: list[dict] = []
 
     for task in protocol.tasks:
         seen_classes = seen_classes + task.global_class_ids
@@ -238,24 +340,47 @@ def run(args):
         method.train_task(task, train_loader)
         method.after_task(task, train_loader)
 
-        # ── Evaluate on all seen classes ──────────────────────────
+        # ── Evaluate on each seen task exactly (task-aware) ───────
         all_preds, all_targets = [], []
-        for eval_ds_name in protocol.dataset_order:
+        for eval_task in protocol.tasks[:task.task_id + 1]:
+            eval_ds_name = eval_task.dataset_name
             eval_ds = datasets[eval_ds_name]
-            # Select seen classes that belong to this dataset
-            ds_seen_local = [c for t in protocol.tasks[:task.task_id + 1]
-                               if t.dataset_name == eval_ds_name
-                               for c in t.class_ids]
-            ds_seen_global = [c for t in protocol.tasks[:task.task_id + 1]
-                                if t.dataset_name == eval_ds_name
-                                for c in t.global_class_ids]
-            if not ds_seen_local:
-                continue
-            test_sub  = eval_ds.test.subset(ds_seen_local)
-            test_sub  = _remap_labels(test_sub, ds_seen_local, ds_seen_global)
+            test_sub = eval_ds.test.subset(eval_task.class_ids)
+            test_sub = _remap_labels(
+                test_sub, eval_task.class_ids, eval_task.global_class_ids
+            )
             test_loader = DataLoader(test_sub, batch_size=args.batch_size * 2,
                                      shuffle=False, num_workers=0)
             preds, targets = method.predict(test_loader)
+            eval_result = evaluate(
+                preds,
+                targets,
+                eval_task.global_class_ids,
+                {g: eval_ds_name for g in eval_task.global_class_ids},
+                [eval_ds_name],
+            )
+            result.add_task_feedback(TaskFeedbackResult(
+                after_task_id=task.task_id,
+                eval_task_id=eval_task.task_id,
+                dataset_name=eval_ds_name,
+                oa=eval_result.oa,
+                aa=eval_result.avg_aa,
+                kappa=eval_result.kappa,
+                num_samples=int(len(targets)),
+            ))
+            task_eval_artifacts.append(_make_task_eval_artifact(
+                after_task_id=task.task_id,
+                eval_task=eval_task,
+                dataset=eval_ds,
+                dataset_mapping=dataset_class_mappings.get(eval_ds_name, {}),
+                args=args,
+                preds=preds,
+                targets=targets,
+                coords=_coords_to_numpy(test_sub),
+                oa=eval_result.oa,
+                aa=eval_result.avg_aa,
+                kappa=eval_result.kappa,
+            ))
             all_preds.append(preds)
             all_targets.append(targets)
 
@@ -291,10 +416,17 @@ def run(args):
     if args.output:
         out = Path(args.output)
         out.parent.mkdir(parents=True, exist_ok=True)
+        task_eval_meta, task_eval_arrays = _split_task_eval_artifacts(task_eval_artifacts)
+        artifacts_file = None
+        if task_eval_arrays:
+            artifacts_path = out.with_name(f"{out.stem}_task_artifacts.npz")
+            np.savez_compressed(artifacts_path, **task_eval_arrays)
+            artifacts_file = artifacts_path.name
         data = {
             "protocol": args.protocol,
             "method":   args.method,
             "seed":     args.seed,
+            "artifact_version": 2,
             "final_oa":    result.final_oa,
             "final_aa":    result.final_aa,
             "final_kappa": result.final_kappa,
@@ -302,12 +434,28 @@ def run(args):
             "fwt":         result.fwt,
             "forgetting":  result.forgetting,
             "plasticity":  result.plasticity,
+            "dataset_mappings": dataset_class_mappings,
             "tasks": [
                 {"task_id": r.task_id, "oa": r.oa, "avg_aa": r.avg_aa,
                  "kappa": r.kappa, "per_dataset": r.per_dataset}
                 for r in result.task_results
             ],
+            "task_feedback": [
+                {
+                    "after_task_id": r.after_task_id,
+                    "eval_task_id": r.eval_task_id,
+                    "dataset_name": r.dataset_name,
+                    "oa": r.oa,
+                    "aa": r.aa,
+                    "kappa": r.kappa,
+                    "num_samples": r.num_samples,
+                }
+                for r in result.task_feedback
+            ],
+            "task_evals": task_eval_meta,
         }
+        if artifacts_file is not None:
+            data["artifacts_file"] = artifacts_file
         with open(out, "w") as f:
             json.dump(data, f, indent=2)
         print(f"\nResults saved → {out}")
@@ -315,18 +463,56 @@ def run(args):
     # ── Plot ──────────────────────────────────────────────────────
     if getattr(args, "plot", False):
         try:
-            from benchmark.eval.plots import plot_task_curves, plot_forgetting_matrix
+            from benchmark.eval.plots import (
+                plot_forgetting_matrix,
+                plot_task_accuracy_matrix,
+                plot_task_curves,
+                plot_task_feedback_curve,
+            )
             stem = Path(args.output).stem if args.output else f"{args.method}_{args.protocol}_seed{args.seed}"
             fig_dir = Path(args.output).parent / "figs" if args.output else Path("figs")
             plot_task_curves(result, save=str(fig_dir / f"{stem}_curves.pdf"))
             plot_forgetting_matrix(result, save=str(fig_dir / f"{stem}_forgetting.pdf"))
+            if result.task_feedback:
+                plot_task_accuracy_matrix(
+                    result,
+                    metric="oa",
+                    save=str(fig_dir / f"{stem}_task_matrix.pdf"),
+                )
+                plot_task_feedback_curve(
+                    result,
+                    metric="oa",
+                    save=str(fig_dir / f"{stem}_task_feedback_curve.pdf"),
+                )
         except ImportError as e:
             print(f"[WARN] Plotting skipped: {e}")
 
     # ── Classification maps ───────────────────────────────────────
-    # Note: per-dataset maps are generated in the eval loop above,
-    # saved as per-dataset .npz files. The --plot_maps flag is a
-    # placeholder for future per-dataset map generation from checkpoints.
+    if getattr(args, "plot_maps", False):
+        try:
+            from benchmark.eval.plots import plot_classification_maps_per_task
+            stem = Path(args.output).stem if args.output else f"{args.method}_{args.protocol}_seed{args.seed}"
+            fig_dir = Path(args.output).parent / "figs" if args.output else Path("figs")
+            by_dataset: dict[str, list[dict]] = {}
+            for artifact in task_eval_artifacts:
+                by_dataset.setdefault(artifact["dataset_name"], []).append(artifact)
+
+            for ds_name_vis, ds_artifacts in by_dataset.items():
+                ds_vis = datasets.get(ds_name_vis)
+                if ds_vis is None:
+                    continue
+                suffix = "" if len(by_dataset) == 1 else f"_{ds_name_vis}"
+                plot_classification_maps_per_task(
+                    gt_map=ds_vis.gt_map,
+                    predictions_per_task=ds_artifacts,
+                    class_names=ds_vis.class_names,
+                    dataset_name=ds_name_vis,
+                    method_name=args.method,
+                    protocol_name=args.protocol,
+                    save=str(fig_dir / f"{stem}{suffix}_maps_per_task.pdf"),
+                )
+        except ImportError as e:
+            print(f"[WARN] Map plotting skipped: {e}")
 
     return result
 
@@ -336,7 +522,6 @@ def run(args):
 def _remap_labels(ds, local_ids: list[int], global_ids: list[int]):
     """Return a copy of PatchDataset with labels mapped from local to global IDs."""
     from benchmark.datasets.base import PatchDataset
-    import torch
     local_to_global = {l: g for l, g in zip(local_ids, global_ids)}
     new_labels = ds.labels.clone()
     for l, g in local_to_global.items():
@@ -345,6 +530,7 @@ def _remap_labels(ds, local_ids: list[int], global_ids: list[int]):
     new_ds.hsi    = ds.hsi
     new_ds.lidar  = ds.lidar
     new_ds.labels = new_labels
+    new_ds.coords = ds.coords
     return new_ds
 
 

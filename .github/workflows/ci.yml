@@ -26,14 +26,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          pip install numpy scipy scikit-learn pyyaml matplotlib seaborn
+          pip install numpy scipy scikit-learn pyyaml matplotlib seaborn pandas
           pip install pytest
 
-      - name: Run tests (excluding method smoke tests)
+      - name: Run tests
         run: |
-          pytest tests/ -v --ignore=tests/test_methods.py -x
-
-      - name: Run method smoke tests
-        run: |
-          pytest tests/test_methods.py -v --timeout=120
+          pytest tests/ -v -x
         timeout-minutes: 10
