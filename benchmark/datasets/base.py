@@ -159,7 +159,7 @@ class RSDataset(ABC):
         key = hashlib.md5(
             (
                 f"pca{self.pca_components}_patch{self.patch_size}_"
-                f"tr{self.train_ratio}_coordsv1"
+                f"tr{self.train_ratio}_coordsv2_trainfit"
             ).encode()
         ).hexdigest()[:12]
         cache_file = cache_dir / f"benchmark_{key}.npz"
