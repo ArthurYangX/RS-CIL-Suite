@@ -384,6 +384,18 @@ tests/                    # 64 个单元测试
 
 ---
 
+## 引用
+
+```bibtex
+@misc{yang2026rscilbench,
+    author       = {Yang, Xiao},
+    title        = {RS-CIL-Bench: A Standardized Class-Incremental Learning Benchmark for Remote Sensing Hyperspectral Imagery},
+    year         = {2026},
+    organization = {GitHub},
+    url          = {https://github.com/ArthurYangX/RS-CIL-Bench},
+}
+```
+
 ## 致谢
 
 感谢所有数据集提供者公开其数据。本基准平台参考了 [PyCIL](https://github.com/G-U-N/PyCIL)、[FACIL](https://github.com/mmasana/FACIL) 及 Zhou et al. (TPAMI 2024) 的类增量学习综述中的设计思路。
