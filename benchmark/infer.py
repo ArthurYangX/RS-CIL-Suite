@@ -119,10 +119,13 @@ def main():
     flat_cfg = flatten_config(cfg)
     flat_cfg.pop("_backbone", None)
 
-    hsi_ch = 36
+    hsi_ch = args.pca_components
     lid_ch = lid_ch_max
     kwargs = dict(hsi_channels=hsi_ch, lidar_channels=lid_ch,
                   num_classes=protocol.total_classes, device=device)
+    # Map config key to method kwarg
+    if "_backbone" in flat_cfg:
+        flat_cfg["backbone"] = flat_cfg.pop("_backbone")
     kwargs.update(flat_cfg)
 
     method = registry[args.method](**kwargs)

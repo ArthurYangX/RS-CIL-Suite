@@ -12,7 +12,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from .base import CILMethod, register_method
-from .ncm import SimpleEncoder
+from benchmark.models import build_backbone
 from benchmark.protocols.cil import Task
 
 
@@ -21,9 +21,10 @@ class GDumb(CILMethod):
     name = "GDumb"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs_final=100, lr=1e-3, memory_size=2000, **kwargs):
-        encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
+                 backbone="simple_encoder", d=128, epochs_final=100, lr=1e-3, memory_size=2000, **kwargs):
+        encoder = build_backbone(backbone, hsi_ch=hsi_channels, lidar_ch=lidar_channels, d=d)
         super().__init__(encoder, device, num_classes)
+        self.backbone_name = backbone
         self.hsi_ch = hsi_channels
         self.lidar_ch = lidar_channels
         self.d = d
@@ -69,8 +70,7 @@ class GDumb(CILMethod):
             return
 
         # Re-init model for fresh training
-        from .ncm import SimpleEncoder
-        self.model = SimpleEncoder(self.hsi_ch, self.lidar_ch, self.d).to(self.device)
+        self.model = build_backbone(self.backbone_name, hsi_ch=self.hsi_ch, lidar_ch=self.lidar_ch, d=self.d).to(self.device)
         self.head = nn.Linear(self.d, self.num_classes_total).to(self.device)
 
         ds = TensorDataset(

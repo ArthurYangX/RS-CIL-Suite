@@ -129,8 +129,16 @@ class CILMethod(ABC):
 
     # ── Checkpointing ──────────────────────────────────────────
 
-    def save_checkpoint(self, path: str | Path, task_id: int):
-        """Save model + method state to a .pt file."""
+    def save_checkpoint(self, path: str | Path, task_id: int,
+                        run_meta: dict | None = None):
+        """Save model + method state to a .pt file.
+
+        Args:
+            path: Output file path.
+            task_id: Current task index.
+            run_meta: Optional dict with reproducibility metadata
+                (protocol, seed, backbone, pca_components, patch_size, config).
+        """
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         ckpt = {
@@ -139,6 +147,8 @@ class CILMethod(ABC):
             "task_id": task_id,
             "method_name": self.name,
         }
+        if run_meta:
+            ckpt["run_meta"] = run_meta
         ckpt.update(self._method_state())
         torch.save(ckpt, path)
 

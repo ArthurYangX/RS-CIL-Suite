@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from .base import CILMethod, register_method
-from benchmark.models import SimpleEncoder
+from benchmark.models import build_backbone
 from benchmark.protocols.cil import Task
 
 
@@ -34,8 +34,8 @@ class TemplateMethod(CILMethod):
     name = "Template"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs=50, lr=1e-3, **kwargs):
-        backbone = SimpleEncoder(hsi_channels, lidar_channels, d)
+                 backbone="simple_encoder", d=128, epochs=50, lr=1e-3, **kwargs):
+        backbone = build_backbone(backbone, hsi_ch=hsi_channels, lidar_ch=lidar_channels, d=d)
         super().__init__(backbone, device, num_classes)
         self.d = d
         self.epochs = epochs

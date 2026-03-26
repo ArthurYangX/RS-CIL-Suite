@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from .base import CILMethod, register_method
-from .ncm import SimpleEncoder
+from benchmark.models import build_backbone
 from benchmark.protocols.cil import Task
 
 
@@ -21,9 +21,10 @@ class FineTune(CILMethod):
     name = "FineTune"
 
     def __init__(self, hsi_channels: int, lidar_channels: int,
-                 num_classes: int, device: torch.device, d: int = 128,
+                 num_classes: int, device: torch.device,
+                 backbone: str = "simple_encoder", d: int = 128,
                  epochs: int = 50, lr: float = 1e-3, **kwargs):
-        encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
+        encoder = build_backbone(backbone, hsi_ch=hsi_channels, lidar_ch=lidar_channels, d=d)
         super().__init__(encoder, device, num_classes)
         self.d = d
         self.epochs = epochs

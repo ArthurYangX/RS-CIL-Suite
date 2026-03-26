@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from .base import CILMethod, register_method
-from .ncm import SimpleEncoder
+from benchmark.models import build_backbone
 from benchmark.protocols.cil import Task
 
 
@@ -25,10 +25,10 @@ class LUCIR(CILMethod):
     name = "LUCIR"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs=50, lr=1e-3,
+                 backbone="simple_encoder", d=128, epochs=50, lr=1e-3,
                  memory_size=2000, lf_lambda=5.0, mr_lambda=1.0,
                  K=2, margin=0.5, **kwargs):
-        encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
+        encoder = build_backbone(backbone, hsi_ch=hsi_channels, lidar_ch=lidar_channels, d=d)
         super().__init__(encoder, device, num_classes)
         self.d = d
         self.epochs = epochs

@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from .base import CILMethod, register_method
-from .ncm import SimpleEncoder
+from benchmark.models import build_backbone
 from benchmark.protocols.cil import Task
 
 
@@ -23,9 +23,9 @@ class PODNet(CILMethod):
     name = "PODNet"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs=50, lr=1e-3,
+                 backbone="simple_encoder", d=128, epochs=50, lr=1e-3,
                  memory_size=2000, pod_lambda=1.0, T=2.0, **kwargs):
-        encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
+        encoder = build_backbone(backbone, hsi_ch=hsi_channels, lidar_ch=lidar_channels, d=d)
         super().__init__(encoder, device, num_classes)
         self.d = d
         self.epochs = epochs

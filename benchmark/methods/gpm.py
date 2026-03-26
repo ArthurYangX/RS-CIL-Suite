@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from .base import CILMethod, register_method
-from .ncm import SimpleEncoder
+from benchmark.models import build_backbone
 from benchmark.protocols.cil import Task
 
 
@@ -27,6 +27,7 @@ class GPM(CILMethod):
     name = "GPM"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
+                 backbone: str = "simple_encoder",
                  d: int = 128,
                  epochs: int = 50,
                  lr: float = 1e-3,
@@ -34,13 +35,14 @@ class GPM(CILMethod):
                  eps: float = 0.1, **kwargs):
         """
         Args:
+            backbone:   Backbone architecture name.
             d:          Feature embedding dimension.
             epochs:     Training epochs per task.
             lr:         Learning rate.
             threshold:  Fraction of variance to retain per layer (SVD cutoff).
             eps:        Slack for projection — allows small gradient leakage.
         """
-        encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
+        encoder = build_backbone(backbone, hsi_ch=hsi_channels, lidar_ch=lidar_channels, d=d)
         super().__init__(encoder, device, num_classes)
         self.d = d
         self.epochs = epochs

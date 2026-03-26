@@ -155,6 +155,11 @@ def _split_task_eval_artifacts(task_eval_artifacts: list[dict]) -> tuple[list[di
     return metadata, arrays
 
 
+def _default_output_path(args) -> Path:
+    """Return the default per-run results path used for saved artifacts."""
+    return Path("results") / f"{args.method}_{args.protocol}_seed{args.seed}.json"
+
+
 # ── wandb helpers ─────────────────────────────────────────────────
 
 def _init_wandb(args, cfg: dict):
@@ -294,7 +299,8 @@ def run(args):
     dataset_class_mappings = build_dataset_class_mappings(protocol, datasets)
 
     # ── Method ────────────────────────────────────────────────────
-    method = _build_method(args.method, protocol, device, datasets, cfg)
+    method = _build_method(args.method, protocol, device, datasets, cfg,
+                           pca_components=args.pca_components)
 
     # Set up wandb logging callback
     if wandb_run:
@@ -304,7 +310,16 @@ def run(args):
             _global_step[0] += 1
         method.log_fn = _wandb_log_fn
 
-    # ── Checkpoint dir ────────────────────────────────────────────
+    # ── Checkpoint dir + run metadata ────────────────────────────
+    run_meta = {
+        "protocol": args.protocol,
+        "method": args.method,
+        "seed": args.seed,
+        "patch_size": args.patch_size,
+        "pca_components": args.pca_components,
+        "backbone": cfg.get("model", {}).get("backbone", "simple_encoder") if cfg else "simple_encoder",
+        "config": cfg,
+    }
     ckpt_dir = None
     if getattr(args, "save_checkpoints", False):
         ckpt_base = Path(getattr(args, "checkpoint_dir", "checkpoints"))
@@ -406,59 +421,66 @@ def run(args):
         # ── Save checkpoint ────────────────────────────────────────
         if ckpt_dir is not None:
             method.save_checkpoint(ckpt_dir / f"task_{task.task_id}.pt",
-                                   task.task_id)
+                                   task.task_id, run_meta=run_meta)
 
     result.compute_cl_metrics()
     print(result.summary())
     _wandb_log_final(wandb_run, result)
 
     # ── Save ──────────────────────────────────────────────────────
-    if args.output:
-        out = Path(args.output)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        task_eval_meta, task_eval_arrays = _split_task_eval_artifacts(task_eval_artifacts)
-        artifacts_file = None
-        if task_eval_arrays:
-            artifacts_path = out.with_name(f"{out.stem}_task_artifacts.npz")
-            np.savez_compressed(artifacts_path, **task_eval_arrays)
-            artifacts_file = artifacts_path.name
-        data = {
-            "protocol": args.protocol,
-            "method":   args.method,
-            "seed":     args.seed,
-            "artifact_version": 2,
-            "final_oa":    result.final_oa,
-            "final_aa":    result.final_aa,
-            "final_kappa": result.final_kappa,
-            "bwt":         result.bwt,
-            "fwt":         result.fwt,
-            "forgetting":  result.forgetting,
-            "plasticity":  result.plasticity,
-            "dataset_mappings": dataset_class_mappings,
-            "tasks": [
-                {"task_id": r.task_id, "oa": r.oa, "avg_aa": r.avg_aa,
-                 "kappa": r.kappa, "per_dataset": r.per_dataset}
-                for r in result.task_results
-            ],
-            "task_feedback": [
-                {
-                    "after_task_id": r.after_task_id,
-                    "eval_task_id": r.eval_task_id,
-                    "dataset_name": r.dataset_name,
-                    "oa": r.oa,
-                    "aa": r.aa,
-                    "kappa": r.kappa,
-                    "num_samples": r.num_samples,
-                }
-                for r in result.task_feedback
-            ],
-            "task_evals": task_eval_meta,
-        }
-        if artifacts_file is not None:
-            data["artifacts_file"] = artifacts_file
-        with open(out, "w") as f:
-            json.dump(data, f, indent=2)
-        print(f"\nResults saved → {out}")
+    out = Path(args.output) if args.output else _default_output_path(args)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    task_eval_meta, task_eval_arrays = _split_task_eval_artifacts(task_eval_artifacts)
+    artifacts_file = None
+    dataset_mappings_for_save = {
+        ds_name: dict(mapping) for ds_name, mapping in dataset_class_mappings.items()
+    }
+    for ds_idx, (ds_name, ds) in enumerate(datasets.items()):
+        gt_key = f"dataset_{ds_idx:02d}_gt_map"
+        task_eval_arrays[gt_key] = ds.gt_map.astype(np.int32, copy=False)
+        dataset_mappings_for_save.setdefault(ds_name, {})["gt_map_key"] = gt_key
+
+    if task_eval_arrays:
+        artifacts_path = out.with_name(f"{out.stem}_task_artifacts.npz")
+        np.savez_compressed(artifacts_path, **task_eval_arrays)
+        artifacts_file = artifacts_path.name
+    data = {
+        "protocol": args.protocol,
+        "method":   args.method,
+        "seed":     args.seed,
+        "artifact_version": 2,
+        "final_oa":    result.final_oa,
+        "final_aa":    result.final_aa,
+        "final_kappa": result.final_kappa,
+        "bwt":         result.bwt,
+        "fwt":         result.fwt,
+        "forgetting":  result.forgetting,
+        "plasticity":  result.plasticity,
+        "dataset_mappings": dataset_mappings_for_save,
+        "tasks": [
+            {"task_id": r.task_id, "oa": r.oa, "avg_aa": r.avg_aa,
+             "kappa": r.kappa, "per_dataset": r.per_dataset}
+            for r in result.task_results
+        ],
+        "task_feedback": [
+            {
+                "after_task_id": r.after_task_id,
+                "eval_task_id": r.eval_task_id,
+                "dataset_name": r.dataset_name,
+                "oa": r.oa,
+                "aa": r.aa,
+                "kappa": r.kappa,
+                "num_samples": r.num_samples,
+            }
+            for r in result.task_feedback
+        ],
+        "task_evals": task_eval_meta,
+    }
+    if artifacts_file is not None:
+        data["artifacts_file"] = artifacts_file
+    with open(out, "w") as f:
+        json.dump(data, f, indent=2)
+    print(f"\nResults saved → {out}")
 
     # ── Plot ──────────────────────────────────────────────────────
     if getattr(args, "plot", False):
@@ -469,8 +491,8 @@ def run(args):
                 plot_task_curves,
                 plot_task_feedback_curve,
             )
-            stem = Path(args.output).stem if args.output else f"{args.method}_{args.protocol}_seed{args.seed}"
-            fig_dir = Path(args.output).parent / "figs" if args.output else Path("figs")
+            stem = out.stem
+            fig_dir = out.parent / "figs"
             plot_task_curves(result, save=str(fig_dir / f"{stem}_curves.pdf"))
             plot_forgetting_matrix(result, save=str(fig_dir / f"{stem}_forgetting.pdf"))
             if result.task_feedback:
@@ -491,8 +513,8 @@ def run(args):
     if getattr(args, "plot_maps", False):
         try:
             from benchmark.eval.plots import plot_classification_maps_per_task
-            stem = Path(args.output).stem if args.output else f"{args.method}_{args.protocol}_seed{args.seed}"
-            fig_dir = Path(args.output).parent / "figs" if args.output else Path("figs")
+            stem = out.stem
+            fig_dir = out.parent / "figs"
             by_dataset: dict[str, list[dict]] = {}
             for artifact in task_eval_artifacts:
                 by_dataset.setdefault(artifact["dataset_name"], []).append(artifact)
@@ -537,14 +559,14 @@ def _remap_labels(ds, local_ids: list[int], global_ids: list[int]):
 # ── Method factory (uses auto-registry + config) ─────────────────
 
 def _build_method(name: str, protocol: CILProtocol, device, datasets,
-                  cfg: dict | None = None):
+                  cfg: dict | None = None, pca_components: int = 36):
     registry = get_method_registry()
     if name not in registry:
         raise ValueError(f"Unknown method '{name}'. "
                          f"Available: {sorted(registry)}")
 
     total  = protocol.total_classes
-    hsi_ch = 36   # always 36 after PCA
+    hsi_ch = pca_components  # matches --pca_components
 
     # Determine LiDAR channel count from actual data
     lid_ch = max(
@@ -557,9 +579,11 @@ def _build_method(name: str, protocol: CILProtocol, device, datasets,
 
     # Merge flattened config into kwargs (config values override defaults)
     if cfg:
-        kwargs.update(flatten_config(cfg))
-        # Remove internal keys
-        kwargs.pop("_backbone", None)
+        flat = flatten_config(cfg)
+        # Map config key to method kwarg
+        if "_backbone" in flat:
+            flat["backbone"] = flat.pop("_backbone")
+        kwargs.update(flat)
 
     return registry[name](**kwargs)
 
@@ -581,7 +605,7 @@ def _build_parser():
     p.add_argument("--seeds",         type=str,   default=None,
                    help="Comma-separated seeds for multi-seed averaging, e.g. '0,1,2'")
     p.add_argument("--output",        default=None,
-                   help="Path to save JSON results")
+                   help="Path to save JSON results (default: results/{method}_{protocol}_seed{seed}.json)")
     # Config
     p.add_argument("--config",        default=None,
                    help="Path to custom YAML config (overrides auto-discovered method config)")
@@ -602,7 +626,7 @@ def _build_parser():
     p.add_argument("--plot",          action="store_true",
                    help="Generate figures after run (requires matplotlib/seaborn)")
     p.add_argument("--plot_maps",     action="store_true",
-                   help="Generate classification maps (requires --save_checkpoints)")
+                   help="Generate HyperKD-style classification maps after the run")
     return p
 
 

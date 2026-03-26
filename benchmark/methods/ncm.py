@@ -19,6 +19,7 @@ from benchmark.protocols.cil import Task
 
 # SimpleEncoder moved to benchmark.models — re-exported here for backward compat
 from benchmark.models import SimpleEncoder  # noqa: F401
+from benchmark.models import build_backbone
 
 
 @register_method("ncm")
@@ -34,9 +35,10 @@ class NCMMethod(CILMethod):
     name = "NCM"
 
     def __init__(self, hsi_channels: int, lidar_channels: int,
-                 num_classes: int, device: torch.device, d: int = 128,
+                 num_classes: int, device: torch.device,
+                 backbone: str = "simple_encoder", d: int = 128,
                  epochs: int = 50, lr: float = 1e-3, **kwargs):
-        model = SimpleEncoder(hsi_channels, lidar_channels, d)
+        model = build_backbone(backbone, hsi_ch=hsi_channels, lidar_ch=lidar_channels, d=d)
         super().__init__(model, device, num_classes)
         self.d = d
         self.epochs = epochs
