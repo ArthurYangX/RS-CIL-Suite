@@ -192,7 +192,7 @@ python benchmark/run.py --protocol configs/protocols/my_protocol.yaml \
 
 ## Visualization
 
-The benchmark generates publication-quality figures automatically with `--plot`:
+The suite generates publication-quality figures automatically with `--plot`:
 
 ### Task accuracy matrix
 
@@ -401,5 +401,5 @@ tests/                    # 64 unit tests
 
 ## Acknowledgements
 
-We thank all dataset providers for making their data publicly available. This benchmark builds on ideas from [PyCIL](https://github.com/G-U-N/PyCIL), [FACIL](https://github.com/mmasana/FACIL), and the CIL survey by Zhou et al. (TPAMI 2024).
+We thank all dataset providers for making their data publicly available. This project builds on ideas from [PyCIL](https://github.com/G-U-N/PyCIL), [FACIL](https://github.com/mmasana/FACIL), and the CIL survey by Zhou et al. (TPAMI 2024).
 
