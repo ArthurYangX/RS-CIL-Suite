@@ -215,10 +215,23 @@ python -c "from benchmark.eval.plots import plot_suite; plot_suite('results/')"
 
 ### Weights & Biases
 
+[Weights & Biases](https://wandb.ai) 是一个免费的实验追踪平台。设置步骤：
+
 ```bash
+# 1. 安装
+pip install wandb
+
+# 2. 在 https://wandb.ai/site 注册免费账号并获取 API key
+
+# 3. 登录（仅需一次）
+wandb login
+
+# 4. 启用追踪运行实验
 python benchmark/run.py --protocol A_IndianPines --method icarl \
     --data_root ~/data --wandb --wandb_project rs-cil-benchmark
 ```
+
+所有指标（每个任务的 OA、AA、Kappa、BWT）会自动记录到你的 wandb 仪表盘。
 
 ### 多种子运行
 

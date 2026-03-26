@@ -216,10 +216,23 @@ python -c "from benchmark.eval.plots import plot_suite; plot_suite('results/')"
 
 ### Weights & Biases
 
+[Weights & Biases](https://wandb.ai) is a free experiment tracking platform. To set up:
+
 ```bash
+# 1. Install
+pip install wandb
+
+# 2. Create a free account at https://wandb.ai/site and get your API key
+
+# 3. Login (one-time)
+wandb login
+
+# 4. Run with tracking enabled
 python benchmark/run.py --protocol A_IndianPines --method icarl \
     --data_root ~/data --wandb --wandb_project rs-cil-benchmark
 ```
+
+All metrics (OA, AA, Kappa, BWT per task) are automatically logged to your wandb dashboard.
 
 ### Multi-seed runs
 
