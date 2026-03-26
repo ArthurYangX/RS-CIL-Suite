@@ -103,7 +103,7 @@ class MUUFL(RSDataset):
         sensor="ITRES CASI-1500 (HSI) + Optech Gemini (LiDAR)",
         resolution_m=1.0,
         hsi_bands=64,
-        lidar_channels=2,
+        lidar_channels=1,  # single elevation raster from first LiDAR return
     )
 
     def _load_gt_map(self):

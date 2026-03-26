@@ -138,7 +138,7 @@ NUM_CLASSES = {
     "Trento":         6,
     "Houston2013":    15,
     "MUUFL":          11,
-    "Augsburg":       7,
+    "Augsburg":       8,
     "Houston2018":    20,
     # HSI only
     "IndianPines":    16,
@@ -161,7 +161,7 @@ PROTOCOL_B1 = build_cross_scene(
 PROTOCOL_B2 = build_cross_scene(
     dataset_order=["Trento", "Houston2013", "MUUFL", "Augsburg"],
     class_splits={"Trento": [2,2,2], "Houston2013": [5,5,5],
-                  "MUUFL": [4,4,3], "Augsburg": [3,2,2]},
+                  "MUUFL": [4,4,3], "Augsburg": [3,3,2]},
     num_classes=NUM_CLASSES,
 )
 
@@ -169,7 +169,7 @@ PROTOCOL_B2 = build_cross_scene(
 PROTOCOL_B3 = build_cross_scene(
     dataset_order=["Trento", "Houston2013", "MUUFL", "Augsburg", "Houston2018"],
     class_splits={"Trento": [2,2,2], "Houston2013": [5,5,5],
-                  "MUUFL": [4,4,3],  "Augsburg": [3,2,2], "Houston2018": [5,5,5,5]},
+                  "MUUFL": [4,4,3],  "Augsburg": [3,3,2], "Houston2018": [5,5,5,5]},
     num_classes=NUM_CLASSES,
 )
 
@@ -177,7 +177,7 @@ PROTOCOL_B3 = build_cross_scene(
 PROTOCOL_A_TRENTO         = build_within_scene("Trento",         [2, 2, 2],       6)
 PROTOCOL_A_HOUSTON2013    = build_within_scene("Houston2013",    [5, 5, 5],      15)
 PROTOCOL_A_MUUFL          = build_within_scene("MUUFL",          [4, 4, 3],      11)
-PROTOCOL_A_AUGSBURG       = build_within_scene("Augsburg",       [3, 2, 2],       7)
+PROTOCOL_A_AUGSBURG       = build_within_scene("Augsburg",       [3, 3, 2],       8)
 PROTOCOL_A_HOUSTON2018    = build_within_scene("Houston2018",    [5, 5, 5, 5],   20)
 PROTOCOL_A_INDIANPINES    = build_within_scene("IndianPines",    [4, 4, 4, 4],   16)
 PROTOCOL_A_PAVIAU         = build_within_scene("PaviaU",         [3, 3, 3],       9)
@@ -189,7 +189,7 @@ PROTOCOL_A_WHUHILONGKOU   = build_within_scene("WHU-Hi-LongKou", [3, 3, 3],     
 PROTOCOL_B4 = build_cross_scene(
     dataset_order=["Trento", "Houston2013", "MUUFL", "Augsburg", "Houston2018"],
     class_splits={"Trento": [2,2,2], "Houston2013": [5,5,5],
-                  "MUUFL": [4,4,3],  "Augsburg": [3,2,2], "Houston2018": [5,5,5,5]},
+                  "MUUFL": [4,4,3],  "Augsburg": [3,3,2], "Houston2018": [5,5,5,5]},
     num_classes=NUM_CLASSES,
 )
 

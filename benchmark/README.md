@@ -81,7 +81,7 @@ Classes from a single dataset split incrementally.
 | `A_Trento` | Trento | 3 | 2 |
 | `A_Houston2013` | Houston2013 | 5 | 3 |
 | `A_MUUFL` | MUUFL | 4 | 3 |
-| `A_Augsburg` | Augsburg | 4 | 2 |
+| `A_Augsburg` | Augsburg | 3 | 3/3/2 |
 | `A_Houston2018` | Houston2018 | 5 | 4 |
 | `A_Berlin` | Berlin | 3 | 3 |
 | `A_WHUHiLongKou` | WHU-Hi-LongKou | 3 | 3 |

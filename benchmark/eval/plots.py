@@ -70,6 +70,18 @@ def _save_publication_figure(fig, save: str | None):
         print(f"[plot] saved → {out}")
 
 
+def _nanmean(values: np.ndarray, axis=None):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        return np.nanmean(values, axis=axis)
+
+
+def _nanstd(values: np.ndarray, axis=None):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        return np.nanstd(values, axis=axis)
+
+
 def _coerce_runs(result_or_runs: Any) -> list[Any]:
     if isinstance(result_or_runs, (list, tuple)):
         return list(result_or_runs)
@@ -179,8 +191,8 @@ def _aggregate_task_curves(runs: list[Any]) -> dict[str, Any] | None:
 
     return {
         "task_ids": task_ids,
-        "mean": {m: np.nanmean(np.vstack(v), axis=0) for m, v in stack.items()},
-        "std": {m: np.nanstd(np.vstack(v), axis=0) for m, v in stack.items()},
+        "mean": {m: _nanmean(np.vstack(v), axis=0) for m, v in stack.items()},
+        "std": {m: _nanstd(np.vstack(v), axis=0) for m, v in stack.items()},
         "num_runs": len(runs),
     }
 
@@ -212,8 +224,8 @@ def _aggregate_task_feedback(result_or_runs: Any, metric: str = "oa") -> dict[st
         "eval_ids": eval_ids,
         "dataset_by_eval": dataset_by_eval,
         "matrices": stack,
-        "mean": np.nanmean(stack, axis=0),
-        "std": np.nanstd(stack, axis=0),
+        "mean": _nanmean(stack, axis=0),
+        "std": _nanstd(stack, axis=0),
         "num_runs": len(runs),
     }
 
@@ -458,28 +470,37 @@ def plot_method_comparison(results: dict[str, Any],
 
     names = list(results.keys())
     scale = 100 if metric != "final_kappa" else 1
-    vals  = [getattr(r, metric) * scale for r in results.values()]
+    vals = []
+    stds = []
+    for result in results.values():
+        runs = _coerce_runs(result)
+        series = [float(_run_attr(run, metric, 0.0)) for run in runs]
+        vals.append(float(np.mean(series)) * scale if series else 0.0)
+        stds.append(float(np.std(series)) * scale if len(series) > 1 else 0.0)
     label = {"final_oa": "Final OA (%)", "final_aa": "Final AA (%)",
              "final_kappa": "Final κ", "bwt": "BWT (pp)", "fwt": "FWT (%)"}
 
     fig, ax = plt.subplots(figsize=(max(6, len(names) * 0.9), 4.5))
     bars = ax.bar(names, vals, color=_PALETTE[:len(names)], width=0.6,
                   edgecolor="white", linewidth=0.8)
+    if any(stds):
+        ax.errorbar(names, vals, yerr=stds, fmt="none", ecolor="#333333",
+                    elinewidth=1, capsize=3, capthick=1)
 
     # Value labels on bars
-    for bar, v in zip(bars, vals):
+    for bar, v, s in zip(bars, vals, stds):
+        txt = f"{v:.1f}" if s == 0 else f"{v:.1f}\n±{s:.1f}"
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.3,
-                f"{v:.1f}", ha="center", va="bottom", fontsize=9)
+                txt, ha="center", va="bottom", fontsize=8)
 
     ax.set_ylabel(label.get(metric, metric))
-    protocol = next(iter(results.values())).protocol_name
+    protocol = _protocol_name(_coerce_runs(next(iter(results.values())))[0])
     ax.set_title(f"{label.get(metric, metric)} — {protocol}")
+    ax.set_xticks(range(len(names)))
     ax.set_xticklabels(names, rotation=30, ha="right")
 
     if save:
-        Path(save).parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(save)
-        print(f"[plot] saved → {save}")
+        _save_publication_figure(fig, save)
     plt.tight_layout()
     return fig
 
@@ -600,13 +621,13 @@ def plot_task_feedback_curve(
     for matrix in matrices:
         seen_vals, current_vals, old_vals = [], [], []
         for col_idx, after_task_id in enumerate(after_ids):
-            seen_vals.append(np.nanmean(matrix[:, col_idx]))
+            seen_vals.append(_nanmean(matrix[:, col_idx]))
             row_idx = eval_to_row.get(after_task_id)
             current_vals.append(matrix[row_idx, col_idx] if row_idx is not None else np.nan)
 
             old_row_indices = [eval_to_row[t] for t in eval_ids if t < after_task_id]
             if old_row_indices:
-                old_vals.append(np.nanmean(matrix[old_row_indices, col_idx]))
+                old_vals.append(_nanmean(matrix[old_row_indices, col_idx]))
             else:
                 old_vals.append(np.nan)
         seen_curves.append(seen_vals)
@@ -627,8 +648,8 @@ def plot_task_feedback_curve(
         ("Old-task mean", old_arr, _PALETTE[2], ":^"),
     ]
     for label, values, color, style in series:
-        mean = np.nanmean(values, axis=0)
-        std = np.nanstd(values, axis=0)
+        mean = _nanmean(values, axis=0)
+        std = _nanstd(values, axis=0)
         ax.plot(after_ids, mean, style, color=color, linewidth=2.2, markersize=6, label=label)
         if values.shape[0] > 1:
             ax.fill_between(after_ids, mean - std, mean + std, color=color, alpha=0.14, linewidth=0)
@@ -670,22 +691,28 @@ def plot_methods_overlay(results: dict[str, Any], metric: str = "oa",
     label_map = {"oa": "OA (%)", "avg_aa": "AA (%)", "kappa": "κ"}
 
     for i, (name, result) in enumerate(results.items()):
-        task_ids = [r.task_id for r in result.task_results]
-        vals = [getattr(r, metric) * scale for r in result.task_results]
-        ax.plot(task_ids, vals, "-o", color=_PALETTE[i % len(_PALETTE)],
+        aggregated = _aggregate_task_curves(_coerce_runs(result))
+        if aggregated is None:
+            continue
+        task_ids = aggregated["task_ids"]
+        vals = aggregated["mean"][metric] * scale
+        stds = aggregated["std"][metric] * scale
+        color = _PALETTE[i % len(_PALETTE)]
+        ax.plot(task_ids, vals, "-o", color=color,
                 label=name, linewidth=2, markersize=5)
+        if aggregated["num_runs"] > 1:
+            ax.fill_between(task_ids, vals - stds, vals + stds,
+                            color=color, alpha=0.14, linewidth=0)
 
     ax.set_xlabel("Task")
     ax.set_ylabel(label_map.get(metric, metric))
-    protocol = next(iter(results.values())).protocol_name
+    protocol = _protocol_name(_coerce_runs(next(iter(results.values())))[0])
     ax.set_title(f"{label_map.get(metric, metric)} progression — {protocol}")
     ax.set_xticks(task_ids)
     ax.legend(loc="lower left", fontsize=9)
 
     if save:
-        Path(save).parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(save)
-        print(f"[plot] saved → {save}")
+        _save_publication_figure(fig, save)
     plt.tight_layout()
     return fig
 
@@ -694,33 +721,30 @@ def plot_methods_overlay(results: dict[str, Any], metric: str = "oa",
 
 def plot_suite(results_dir: str | Path, out_dir: str | Path = "figs/",
                protocol_filter: str | None = None):
-    """Load all JSON result files from results_dir and generate all plots.
-
-    Properly aggregates multiple seeds (mean ± std) instead of using only
-    the first run.  Also generates task-feedback matrix and feedback curves
-    when ``task_feedback`` data is available in the JSON files.
-
-    Args:
-        results_dir:     directory with .json result files
-        out_dir:         where to save figures
-        protocol_filter: only plot results for this protocol (e.g. "B1")
-    """
+    """Generate the full plotting suite from saved result files."""
     results_dir = Path(results_dir)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load all JSON files (recursive)
-    by_protocol: dict[str, dict[str, list]] = {}
+    by_protocol: dict[str, dict[str, list[_SimpleResult]]] = {}
     for f in sorted(results_dir.glob("**/*.json")):
         try:
             data = json.loads(f.read_text())
         except Exception:
             continue
-        proto  = data.get("protocol", "unknown")
-        method = data.get("method",   "unknown")
+        if "method" not in data or "protocol" not in data:
+            continue
+        # Skip multi-seed summary files when per-seed files are also present.
+        if "seeds" in data and "seed" not in data and not data.get("task_evals"):
+            continue
+
+        proto = data.get("protocol", "unknown")
+        method = data.get("method", "unknown")
         if protocol_filter and proto != protocol_filter:
             continue
-        by_protocol.setdefault(proto, {}).setdefault(method, []).append(data)
+        by_protocol.setdefault(proto, {}).setdefault(method, []).append(
+            _json_to_result(data, proto, method, source_file=f)
+        )
 
     if not by_protocol:
         print(f"[plot_suite] no JSON files found in {results_dir}")
@@ -729,39 +753,106 @@ def plot_suite(results_dir: str | Path, out_dir: str | Path = "figs/",
     plt = _mpl()
 
     for proto, methods in by_protocol.items():
-        reconstructed: dict[str, Any] = {}
-        for method, runs in methods.items():
-            # Real multi-seed aggregation
-            r = _json_to_result_averaged(runs, proto, method)
-            reconstructed[method] = r
-
-        # Method comparison bar charts
         for metric in ("final_oa", "final_aa", "bwt"):
             plot_method_comparison(
-                reconstructed, metric=metric,
-                save=str(out_dir / f"{proto}_{metric}_bar.pdf")
+                methods,
+                metric=metric,
+                save=str(out_dir / f"{proto}_{metric}_bar.pdf"),
             )
 
-        # Per-method plots
-        for method, r in reconstructed.items():
-            plot_task_curves(r, save=str(out_dir / f"{proto}_{method}_curve.pdf"))
+        for method, runs in methods.items():
+            plot_task_curves(runs, save=str(out_dir / f"{proto}_{method}_curve.pdf"))
+            plot_task_accuracy_matrix(
+                runs, metric="oa",
+                save=str(out_dir / f"{proto}_{method}_task_matrix.pdf"),
+            )
+            plot_task_feedback_curve(
+                runs, metric="oa",
+                save=str(out_dir / f"{proto}_{method}_task_feedback_curve.pdf"),
+            )
 
-            # Task-feedback plots (if data available)
-            if getattr(r, "_task_feedback_raw", None):
-                plot_task_accuracy_matrix(
-                    r, metric="oa",
-                    save=str(out_dir / f"{proto}_{method}_task_matrix.pdf"),
-                )
-                plot_task_feedback_curve(
-                    r, metric="oa",
-                    save=str(out_dir / f"{proto}_{method}_task_feedback_curve.pdf"),
-                )
+            # Maps-per-task use the first run that has exact saved artifacts.
+            map_run = next((run for run in runs if _task_eval_records(run) and _artifact_path(run)), None)
+            if map_run is not None:
+                artifact_arrays = _load_artifact_arrays(map_run)
+                if artifact_arrays is not None:
+                    for ds_name, mapping in _dataset_mappings(map_run).items():
+                        gt_key = mapping.get("gt_map_key")
+                        if gt_key is None or gt_key not in artifact_arrays:
+                            warnings.warn(
+                                f"GT map unavailable for {proto}/{method}/{ds_name}; skipping maps-per-task.",
+                                RuntimeWarning,
+                            )
+                            continue
+                        task_evals = [
+                            _materialize_task_eval(record, artifact_arrays)
+                            for record in _task_eval_records(map_run)
+                            if record.get("dataset_name") == ds_name
+                        ]
+                        if not task_evals:
+                            continue
+                        suffix = "" if len(_dataset_mappings(map_run)) == 1 else f"_{ds_name}"
+                        plot_classification_maps_per_task(
+                            gt_map=artifact_arrays[gt_key],
+                            predictions_per_task=task_evals,
+                            class_names=mapping.get("class_names", []),
+                            dataset_name=ds_name,
+                            method_name=method,
+                            protocol_name=proto,
+                            save=str(out_dir / f"{proto}_{method}{suffix}_maps_per_task.pdf"),
+                        )
 
-        # Overlay
-        if len(reconstructed) > 1:
+        if len(methods) > 1:
+            all_datasets = sorted({
+                ds_name
+                for runs in methods.values()
+                for run in runs
+                for ds_name in _dataset_mappings(run).keys()
+            })
+            for ds_name in all_datasets:
+                method_predictions: dict[str, list[dict]] = {}
+                class_names: list[str] | None = None
+                gt_map = None
+                for method, runs in methods.items():
+                    map_run = next(
+                        (run for run in runs if ds_name in _dataset_mappings(run) and _task_eval_records(run) and _artifact_path(run)),
+                        None,
+                    )
+                    if map_run is None:
+                        continue
+                    artifact_arrays = _load_artifact_arrays(map_run)
+                    if artifact_arrays is None:
+                        continue
+                    mapping = _dataset_mappings(map_run).get(ds_name, {})
+                    gt_key = mapping.get("gt_map_key")
+                    if gt_key is None or gt_key not in artifact_arrays:
+                        continue
+                    gt_map = artifact_arrays[gt_key]
+                    class_names = mapping.get("class_names", [])
+                    task_evals = [
+                        _materialize_task_eval(record, artifact_arrays)
+                        for record in _task_eval_records(map_run)
+                        if record.get("dataset_name") == ds_name
+                    ]
+                    if task_evals:
+                        method_predictions[method] = task_evals
+
+                if gt_map is not None and class_names and len(method_predictions) > 1:
+                    suffix = "" if len(all_datasets) == 1 else f"_{ds_name}"
+                    plot_multi_method_maps(
+                        gt_map=gt_map,
+                        method_predictions=method_predictions,
+                        class_names=class_names,
+                        dataset_name=ds_name,
+                        protocol_name=proto,
+                        save=str(out_dir / f"{proto}{suffix}_multi_method_maps.pdf"),
+                    )
+
+        if len(methods) > 1:
             plot_methods_overlay(
-                reconstructed, metric="oa",
-                save=str(out_dir / f"{proto}_overlay_oa.pdf")
+                methods,
+                metric="oa",
+                save=str(out_dir / f"{proto}_overlay_oa.pdf"),
             )
 
         plt.close("all")
@@ -773,18 +864,21 @@ def plot_suite(results_dir: str | Path, out_dir: str | Path = "figs/",
 
 class _SimpleResult:
     """Lightweight result object reconstructed from a saved JSON dict."""
-    def __init__(self, d: dict, protocol: str, method: str):
+    def __init__(self, d: dict, protocol: str, method: str, source_file: str | Path | None = None):
         self.protocol_name = protocol
         self.method_name   = method
+        self.seed = d.get("seed")
+        self.source_file = str(source_file) if source_file is not None else None
         self.final_oa    = d.get("final_oa",    d.get("oa_mean",    0.0))
         self.final_aa    = d.get("final_aa",    d.get("aa_mean",    0.0))
         self.final_kappa = d.get("final_kappa", d.get("kappa_mean", 0.0))
         self.bwt         = d.get("bwt",         d.get("bwt_mean",   0.0))
         self.fwt         = d.get("fwt",         d.get("fwt_mean",   0.0))
         self.task_results = [_SimpleTaskResult(t) for t in d.get("tasks", [])]
-        # Task feedback (if available)
         self.task_feedback = d.get("task_feedback", [])
-        self._task_feedback_raw = d.get("task_feedback", [])
+        self.task_evals = d.get("task_evals", [])
+        self.dataset_mappings = d.get("dataset_mappings", {})
+        self.artifacts_file = d.get("artifacts_file")
 
 
 class _SimpleTaskResult:
@@ -795,65 +889,13 @@ class _SimpleTaskResult:
         self.kappa   = d.get("kappa",   0.0)
 
 
-def _json_to_result(d: dict, protocol: str, method: str) -> _SimpleResult:
-    return _SimpleResult(d, protocol, method)
-
-
-def _json_to_result_averaged(runs: list[dict], protocol: str,
-                              method: str) -> _SimpleResult:
-    """Average multiple seed runs into a single result object.
-
-    Task-level metrics are averaged element-wise across runs that have
-    the same number of tasks.
-    """
-    if len(runs) == 1:
-        return _SimpleResult(runs[0], protocol, method)
-
-    # Average scalar metrics
-    def _mean(key, fallback_key=None):
-        vals = []
-        for r in runs:
-            v = r.get(key)
-            if v is None and fallback_key:
-                v = r.get(fallback_key)
-            if v is not None:
-                vals.append(v)
-        return float(np.mean(vals)) if vals else 0.0
-
-    averaged: dict = {
-        "final_oa":    _mean("final_oa", "oa_mean"),
-        "final_aa":    _mean("final_aa", "aa_mean"),
-        "final_kappa": _mean("final_kappa", "kappa_mean"),
-        "bwt":         _mean("bwt", "bwt_mean"),
-        "fwt":         _mean("fwt", "fwt_mean"),
-    }
-
-    # Average per-task metrics
-    task_lists = [r.get("tasks", []) for r in runs]
-    n_tasks = min(len(t) for t in task_lists) if task_lists else 0
-    tasks_avg = []
-    for i in range(n_tasks):
-        tasks_avg.append({
-            "task_id": task_lists[0][i].get("task_id", i),
-            "oa":      float(np.mean([t[i].get("oa", 0) for t in task_lists])),
-            "avg_aa":  float(np.mean([t[i].get("avg_aa", 0) for t in task_lists])),
-            "kappa":   float(np.mean([t[i].get("kappa", 0) for t in task_lists])),
-        })
-    averaged["tasks"] = tasks_avg
-
-    # Average task_feedback (use first run's structure, average values)
-    fb_lists = [r.get("task_feedback", []) for r in runs]
-    if all(fb_lists) and len(set(len(fb) for fb in fb_lists)) == 1:
-        fb_avg = []
-        for i in range(len(fb_lists[0])):
-            entry = dict(fb_lists[0][i])  # copy structure
-            for key in ("oa", "aa", "kappa"):
-                vals = [fb[i].get(key, 0) for fb in fb_lists]
-                entry[key] = float(np.mean(vals))
-            fb_avg.append(entry)
-        averaged["task_feedback"] = fb_avg
-
-    return _SimpleResult(averaged, protocol, method)
+def _json_to_result(
+    d: dict,
+    protocol: str,
+    method: str,
+    source_file: str | Path | None = None,
+) -> _SimpleResult:
+    return _SimpleResult(d, protocol, method, source_file=source_file)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -870,21 +912,11 @@ def plot_classification_map(
     save: str | None = None,
     show_legend: bool = True,
     show_errors: bool = False,
+    coords: np.ndarray | None = None,
+    global_to_local: dict[int, int] | None = None,
 ):
-    """Render a classification map overlaying predictions on the ground truth.
-
-    Args:
-        gt_map:       (H, W) int array, 1-indexed (0 = background).
-        preds:        (N,) predicted class IDs (global).
-        targets:      (N,) ground-truth class IDs (global).
-        class_names:  List of class names for the legend.
-        dataset_name: Dataset name for colour palette lookup.
-        title:        Figure title.
-        save:         Path to save (pdf/png/svg).
-        show_legend:  Whether to show the colour legend.
-        show_errors:  If True, highlight misclassifications in red.
-    """
-    from benchmark.eval.colors import get_colormap, label_map_to_rgb
+    """Render a classification map using exact spatial coordinates when available."""
+    from benchmark.eval.colors import get_colormap
 
     _set_style()
     plt = _mpl()
@@ -892,33 +924,17 @@ def plot_classification_map(
     num_classes = len(class_names)
     ds_name = dataset_name or ""
     cmap = get_colormap(ds_name, num_classes)
+    gt_rgb = _render_classification_map_rgb(
+        gt_map=gt_map,
+        preds=preds,
+        targets=targets,
+        num_classes=num_classes,
+        dataset_name=ds_name,
+        coords=coords,
+        global_to_local=global_to_local,
+        show_errors=show_errors,
+    )
 
-    # Build the RGB image from ground truth (faded background)
-    gt_rgb = label_map_to_rgb(gt_map, ds_name, num_classes).astype(np.float32)
-    # Fade non-test background
-    gt_rgb *= 0.3
-
-    # Reconstruct prediction map from (preds, targets) — map back to spatial coords
-    # We overlay predictions onto the GT map where test pixels exist
-    pred_map = np.zeros_like(gt_map)
-    test_coords = _find_test_coords(gt_map, targets)
-    if test_coords is not None:
-        for (r, c), p in zip(test_coords, preds):
-            pred_map[r, c] = p
-
-        # Paint predictions with full saturation
-        for (r, c), p in zip(test_coords, preds):
-            if p > 0 and p <= num_classes:
-                gt_rgb[r, c] = cmap[int(p)].astype(np.float32)
-
-        if show_errors:
-            for (r, c), p, t in zip(test_coords, preds, targets):
-                if p != t:
-                    gt_rgb[r, c] = [255, 0, 0]  # red for errors
-
-    gt_rgb = np.clip(gt_rgb, 0, 255).astype(np.uint8)
-
-    # Plot
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.imshow(gt_rgb)
     ax.set_title(title or f"Classification Map — {ds_name}", fontsize=12)
@@ -935,36 +951,57 @@ def plot_classification_map(
                   framealpha=0.8)
 
     if save:
-        Path(save).parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(save, bbox_inches="tight")
-        print(f"[plot] saved → {save}")
+        _save_publication_figure(fig, save)
     plt.tight_layout()
     return fig
 
 
-def _find_test_coords(gt_map, targets):
+def _find_test_coords(gt_map, targets, global_to_local=None):
     """Match test pixel targets back to their (row, col) in gt_map.
 
-    Returns (N, 2) array of (row, col) or None if matching fails.
+    This is an **approximate fallback** for legacy result files that lack
+    exact saved coordinates.  New experiments should always use exact coords.
+
+    Args:
+        gt_map:          (H, W) int array, 1-indexed local labels.
+        targets:         (N,) array, may be global IDs.
+        global_to_local: Optional mapping {global_id: local_id} for cross-scene
+                         protocols where targets use global IDs but gt_map uses
+                         1-indexed local IDs.
+
+    Returns:
+        (N, 2) array of (row, col) or None if matching fails.
     """
-    # Build a mapping from label → list of coords in gt_map
-    unique_targets = np.unique(targets)
+    import warnings
+    warnings.warn(
+        "Using approximate coordinate reconstruction. "
+        "New experiments should rely on exact saved coords instead.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+
+    # Map targets to local labels that match gt_map (1-indexed)
+    if global_to_local is not None:
+        local_targets = np.array([global_to_local.get(int(t), int(t)) + 1
+                                  for t in targets])
+    else:
+        local_targets = targets
+
+    unique_targets = np.unique(local_targets)
     coords_by_class = {}
     for c in unique_targets:
         rows, cols = np.where(gt_map == c)
         coords_by_class[c] = list(zip(rows, cols))
 
-    # Try to assign coords: iterate through targets, pop from coords_by_class
-    # This is approximate (test pixels are a subset of gt_map pixels)
     result = []
     usage = {c: 0 for c in unique_targets}
-    for t in targets:
+    for t in local_targets:
         c = int(t)
         if c in coords_by_class and usage[c] < len(coords_by_class[c]):
             result.append(coords_by_class[c][usage[c]])
             usage[c] += 1
         else:
-            result.append((0, 0))  # fallback
+            result.append((0, 0))
 
     return np.array(result)
 
@@ -981,100 +1018,79 @@ def plot_classification_maps_per_task(
     method_name: str | None = None,
     protocol_name: str | None = None,
     save: str | None = None,
+    show_oa: bool = True,
+    max_cols: int = 5,
 ):
-    """HyperKD Fig.8-style classification map grid showing CIL evolution.
-
-    Layout: columns = [Ground Truth, After Task 0, After Task 1, …]
-    Each panel is a spatial classification map on the same scene using a
-    fixed colour palette.  Uses exact pixel coordinates when available
-    (stored in ``task_data["coords"]``), falls back to ``_find_test_coords``
-    for legacy result files.
-
-    Args:
-        gt_map:               (H, W) int, 1-indexed ground truth (0 = bg).
-        predictions_per_task: List of dicts with keys:
-            - ``preds``   : (N,) int array — predicted *local* class IDs
-            - ``targets`` : (N,) int array — ground-truth *local* class IDs
-            - ``coords``  : (N, 2) int array or None — exact (row, col)
-            - ``after_task_id``: int
-            - ``oa``      : float (optional, shown as annotation)
-        class_names:  Class names for the legend.
-        dataset_name: For colour palette lookup.
-        method_name:  Shown in suptitle.
-        protocol_name: Shown in suptitle.
-        save:         Path to save (pdf/png).
-    """
+    """HyperKD-style exact-coordinate classification evolution figure."""
     from benchmark.eval.colors import get_colormap, label_map_to_rgb
+    from matplotlib.patches import Patch
 
     _set_style()
     plt = _mpl()
-    from matplotlib.patches import Patch
 
     num_classes = len(class_names)
     ds_name = dataset_name or ""
+    dataset_mapping = {
+        "class_names": list(class_names),
+        "local_class_ids": predictions_per_task[0].get("dataset_local_class_ids", list(range(len(class_names)))),
+        "global_class_ids": predictions_per_task[0].get("dataset_global_class_ids", []),
+    } if predictions_per_task else {"class_names": list(class_names)}
+    snapshots = _build_prediction_snapshots(
+        predictions_per_task,
+        dataset_name=ds_name,
+        dataset_mapping=dataset_mapping,
+    )
+    if not snapshots:
+        warnings.warn(
+            f"Exact coordinates are unavailable for dataset '{ds_name}'; skipping maps-per-task figure.",
+            RuntimeWarning,
+        )
+        return None
+
     cmap = get_colormap(ds_name, num_classes)
-    n_panels = 1 + len(predictions_per_task)  # GT + per-task
+    panels = [{"title": "Ground Truth", "rgb": label_map_to_rgb(gt_map, ds_name, num_classes)}]
+    for snapshot in snapshots:
+        title = f"After T{snapshot['after_task_id'] + 1}"
+        if show_oa:
+            title += f"\nOA={snapshot['oa'] * 100:.1f}%"
+        panels.append({
+            "title": title,
+            "rgb": _render_classification_map_rgb(
+                gt_map=gt_map,
+                preds=snapshot["preds"],
+                targets=snapshot["targets"],
+                num_classes=num_classes,
+                dataset_name=ds_name,
+                coords=snapshot["coords"],
+                global_to_local=snapshot.get("global_to_local"),
+            ),
+        })
 
-    fig, axes = plt.subplots(1, n_panels, figsize=(3.2 * n_panels, 4.5))
-    if n_panels == 1:
-        axes = [axes]
+    n_panels = len(panels)
+    ncols = min(max_cols, n_panels)
+    nrows = int(np.ceil(n_panels / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4.1 * ncols, 3.9 * nrows))
+    axes = np.atleast_1d(axes).reshape(nrows, ncols)
 
-    # Column 0: Ground Truth
-    gt_rgb = label_map_to_rgb(gt_map, ds_name, num_classes)
-    axes[0].imshow(gt_rgb)
-    axes[0].set_title("Ground Truth", fontsize=9, fontweight="bold")
-    axes[0].axis("off")
+    for ax, panel in zip(axes.flat, panels):
+        ax.imshow(panel["rgb"])
+        ax.set_title(panel["title"], fontsize=9)
+        ax.axis("off")
+    for ax in axes.flat[len(panels):]:
+        ax.axis("off")
 
-    # Columns 1..T: predictions after each task
-    for col, task_data in enumerate(predictions_per_task, start=1):
-        img = label_map_to_rgb(gt_map, ds_name, num_classes).astype(np.float32)
-        img *= 0.25  # faded background
-
-        preds = task_data["preds"]
-        coords = task_data.get("coords")
-        if coords is None:
-            print(f"[WARN] No exact coords for task {task_data.get('after_task_id','?')}; "
-                  "using approximate reconstruction")
-            coords = _find_test_coords(gt_map, task_data["targets"])
-
-        if coords is not None:
-            for (r, c), p in zip(coords, preds):
-                if 0 < int(p) <= num_classes:
-                    img[int(r), int(c)] = cmap[int(p)].astype(np.float32)
-
-        img = np.clip(img, 0, 255).astype(np.uint8)
-        axes[col].imshow(img)
-        tid = task_data.get("after_task_id", col - 1)
-        title = f"After Task {tid}"
-        oa = task_data.get("oa")
-        if oa is not None:
-            title += f"\nOA={oa*100:.1f}%"
-        axes[col].set_title(title, fontsize=8)
-        axes[col].axis("off")
-
-    # Legend below
     legend_elements = [
         Patch(facecolor=np.array(cmap[i + 1]) / 255.0, label=name)
         for i, name in enumerate(class_names)
     ]
     fig.legend(handles=legend_elements, loc="lower center",
-               fontsize=6, ncol=min(num_classes, 8),
-               framealpha=0.9, borderpad=0.5)
+               fontsize=6, ncol=min(num_classes, 8), framealpha=0.9)
 
-    suptitle = ds_name
-    if method_name:
-        suptitle = f"{method_name} — {suptitle}"
-    if protocol_name:
-        suptitle += f" ({protocol_name})"
-    fig.suptitle(suptitle, fontsize=11, fontweight="bold", y=1.02)
-
+    title_bits = [bit for bit in (method_name, ds_name, protocol_name) if bit]
+    fig.suptitle(" — ".join(title_bits) if title_bits else ds_name, fontsize=11, y=1.01)
     fig.subplots_adjust(bottom=0.12)
     if save:
-        Path(save).parent.mkdir(parents=True, exist_ok=True)
-        for ext in (".pdf", ".png"):
-            fig.savefig(str(Path(save).with_suffix(ext)),
-                        bbox_inches="tight", dpi=300)
-        print(f"[plot] saved → {save}")
+        _save_publication_figure(fig, save)
     return fig
 
 
@@ -1083,22 +1099,13 @@ def plot_multi_method_maps(
     method_predictions: dict[str, list[dict]],
     class_names: list[str],
     dataset_name: str | None = None,
-    task_id: int = -1,
+    protocol_name: str | None = None,
     save: str | None = None,
+    show_oa: bool = True,
 ):
-    """Side-by-side classification maps comparing multiple methods.
+    """Multi-method exact-coordinate comparison figure.
 
-    Layout: columns = [Ground Truth, Method1, Method2, …]
-
-    Args:
-        gt_map:             (H, W) int ground truth.
-        method_predictions: {method_name: [artifact_dicts]} — use
-                            the artifact whose after_task_id == task_id
-                            (or the last one if task_id == -1).
-        class_names:        For colour palette.
-        dataset_name:       For colour palette.
-        task_id:            Which task snapshot to show (-1 = last).
-        save:               Path to save.
+    Rows are incremental stages, columns are GT + methods.
     """
     from benchmark.eval.colors import get_colormap, label_map_to_rgb
     from matplotlib.patches import Patch
@@ -1110,42 +1117,62 @@ def plot_multi_method_maps(
     ds_name = dataset_name or ""
     cmap = get_colormap(ds_name, num_classes)
     methods = list(method_predictions.keys())
-    n_cols = 1 + len(methods)
+    snapshots_by_method = {
+        method: _build_prediction_snapshots(preds, dataset_name=ds_name)
+        for method, preds in method_predictions.items()
+    }
+    available_methods = {
+        method: snapshots for method, snapshots in snapshots_by_method.items() if snapshots
+    }
+    if not available_methods:
+        warnings.warn(
+            f"No exact-coordinate snapshots available for dataset '{ds_name}'.",
+            RuntimeWarning,
+        )
+        return None
 
-    fig, axes = plt.subplots(1, n_cols, figsize=(3.2 * n_cols, 4.5))
-    if n_cols == 1:
-        axes = [axes]
+    after_ids = sorted({
+        snapshot["after_task_id"]
+        for snapshots in available_methods.values()
+        for snapshot in snapshots
+    })
+    nrows = len(after_ids)
+    ncols = 1 + len(available_methods)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(3.2 * ncols, 3.0 * nrows))
+    axes = np.atleast_1d(axes).reshape(nrows, ncols)
 
-    # GT
-    axes[0].imshow(label_map_to_rgb(gt_map, ds_name, num_classes))
-    axes[0].set_title("Ground Truth", fontsize=9, fontweight="bold")
-    axes[0].axis("off")
+    method_names = list(available_methods.keys())
+    for row_idx, after_task_id in enumerate(after_ids):
+        axes[row_idx, 0].imshow(label_map_to_rgb(gt_map, ds_name, num_classes))
+        axes[row_idx, 0].set_title("Ground Truth" if row_idx == 0 else "")
+        axes[row_idx, 0].axis("off")
+        axes[row_idx, 0].set_ylabel(f"After T{after_task_id + 1}", fontsize=9)
 
-    for col, method in enumerate(methods, start=1):
-        artifacts = method_predictions[method]
-        if task_id == -1:
-            art = artifacts[-1]
-        else:
-            art = next((a for a in artifacts if a.get("after_task_id") == task_id),
-                       artifacts[-1])
-
-        img = label_map_to_rgb(gt_map, ds_name, num_classes).astype(np.float32)
-        img *= 0.25
-        coords = art.get("coords")
-        if coords is None:
-            coords = _find_test_coords(gt_map, art["targets"])
-        if coords is not None:
-            for (r, c), p in zip(coords, art["preds"]):
-                if 0 < int(p) <= num_classes:
-                    img[int(r), int(c)] = cmap[int(p)].astype(np.float32)
-        img = np.clip(img, 0, 255).astype(np.uint8)
-        axes[col].imshow(img)
-        oa = art.get("oa")
-        title = method
-        if oa is not None:
-            title += f"\nOA={oa*100:.1f}%"
-        axes[col].set_title(title, fontsize=8)
-        axes[col].axis("off")
+        for col_idx, method_name in enumerate(method_names, start=1):
+            snapshot = next(
+                (item for item in available_methods[method_name] if item["after_task_id"] == after_task_id),
+                None,
+            )
+            if snapshot is None:
+                axes[row_idx, col_idx].axis("off")
+                continue
+            rgb = _render_classification_map_rgb(
+                gt_map=gt_map,
+                preds=snapshot["preds"],
+                targets=snapshot["targets"],
+                num_classes=num_classes,
+                dataset_name=ds_name,
+                coords=snapshot["coords"],
+                global_to_local=snapshot.get("global_to_local"),
+            )
+            axes[row_idx, col_idx].imshow(rgb)
+            title = method_name if row_idx == 0 else ""
+            if row_idx == 0 and show_oa:
+                title += f"\nOA={snapshot['oa'] * 100:.1f}%"
+            elif show_oa:
+                title = f"OA={snapshot['oa'] * 100:.1f}%"
+            axes[row_idx, col_idx].set_title(title, fontsize=8)
+            axes[row_idx, col_idx].axis("off")
 
     legend_elements = [
         Patch(facecolor=np.array(cmap[i + 1]) / 255.0, label=name)
@@ -1153,179 +1180,12 @@ def plot_multi_method_maps(
     ]
     fig.legend(handles=legend_elements, loc="lower center",
                fontsize=6, ncol=min(num_classes, 8), framealpha=0.9)
+    title_bits = [bit for bit in (protocol_name, ds_name) if bit]
+    fig.suptitle(" — ".join(title_bits) if title_bits else ds_name, fontsize=11, y=1.01)
     fig.subplots_adjust(bottom=0.12)
 
     if save:
-        Path(save).parent.mkdir(parents=True, exist_ok=True)
-        for ext in (".pdf", ".png"):
-            fig.savefig(str(Path(save).with_suffix(ext)),
-                        bbox_inches="tight", dpi=300)
-        print(f"[plot] saved → {save}")
-    return fig
-
-
-# ══════════════════════════════════════════════════════════════════
-# 7b. Task-feedback accuracy matrix (true CIL heatmap)
-# ══════════════════════════════════════════════════════════════════
-
-def plot_task_accuracy_matrix(
-    result,
-    metric: str = "oa",
-    save: str | None = None,
-):
-    """True CIL task-feedback accuracy heatmap.
-
-    Rows   = evaluated task (task whose classes are being tested)
-    Columns = after learning task t (training stage)
-    Value  = OA or AA on that specific task at that training stage
-
-    Requires ``result.task_feedback`` to be populated (list of
-    ``TaskFeedbackResult`` with ``after_task_id``, ``eval_task_id``,
-    ``oa``, ``aa``).
-
-    Args:
-        result:  BenchmarkResult with .task_feedback populated.
-        metric:  "oa" or "aa".
-        save:    Path to save (both .pdf and .png are generated).
-    """
-    _set_style()
-    plt = _mpl()
-    sns = _sns()
-
-    feedback = getattr(result, "task_feedback", None)
-    if not feedback:
-        # Try to reconstruct from JSON-loaded data
-        feedback = getattr(result, "_task_feedback_raw", None)
-    if not feedback:
-        print("[plot_task_accuracy_matrix] no task_feedback data, skipping")
-        return None
-
-    # Build the matrix
-    after_ids = sorted({f.after_task_id if hasattr(f, 'after_task_id') else f["after_task_id"]
-                        for f in feedback})
-    eval_ids = sorted({f.eval_task_id if hasattr(f, 'eval_task_id') else f["eval_task_id"]
-                       for f in feedback})
-    n_after = len(after_ids)
-    n_eval = len(eval_ids)
-
-    matrix = np.full((n_eval, n_after), np.nan)
-    after_map = {t: i for i, t in enumerate(after_ids)}
-    eval_map = {t: i for i, t in enumerate(eval_ids)}
-
-    for f in feedback:
-        at = f.after_task_id if hasattr(f, 'after_task_id') else f["after_task_id"]
-        et = f.eval_task_id if hasattr(f, 'eval_task_id') else f["eval_task_id"]
-        val = getattr(f, metric, None) or f.get(metric, f.get("oa", 0))
-        if at in after_map and et in eval_map:
-            matrix[eval_map[et], after_map[at]] = val * 100
-
-    fig, ax = plt.subplots(figsize=(max(5, n_after * 0.9 + 1),
-                                     max(4, n_eval * 0.7 + 1)))
-    sns.heatmap(
-        matrix, ax=ax, annot=True, fmt=".1f",
-        cmap="RdYlGn", vmin=30, vmax=100,
-        linewidths=0.5, linecolor="white",
-        mask=np.isnan(matrix),
-        xticklabels=[str(t) for t in after_ids],
-        yticklabels=[str(t) for t in eval_ids],
-        cbar_kws={"label": f"{metric.upper()} (%)"},
-    )
-    ax.set_xlabel("After learning task", fontsize=10)
-    ax.set_ylabel("Evaluated task", fontsize=10)
-    method = getattr(result, "method_name", "")
-    proto = getattr(result, "protocol_name", "")
-    ax.set_title(f"Task Accuracy Matrix — {method} / {proto}", fontsize=11)
-
-    if save:
-        Path(save).parent.mkdir(parents=True, exist_ok=True)
-        for ext in (".pdf", ".png"):
-            fig.savefig(str(Path(save).with_suffix(ext)),
-                        bbox_inches="tight", dpi=300)
-        print(f"[plot] saved → {save}")
-    plt.tight_layout()
-    return fig
-
-
-def plot_task_feedback_curve(
-    result,
-    metric: str = "oa",
-    save: str | None = None,
-):
-    """Line plot showing how old-task and new-task accuracy evolve.
-
-    Three curves:
-      - Mean accuracy on all seen tasks (average OA across evaluated tasks)
-      - Mean accuracy on OLD tasks only (forgetting indicator)
-      - Accuracy on the CURRENT task (plasticity indicator)
-
-    Args:
-        result: BenchmarkResult with .task_feedback.
-        metric: "oa" or "aa".
-        save:   Path to save.
-    """
-    _set_style()
-    plt = _mpl()
-
-    feedback = getattr(result, "task_feedback", None)
-    if not feedback:
-        feedback = getattr(result, "_task_feedback_raw", None)
-    if not feedback:
-        print("[plot_task_feedback_curve] no task_feedback data, skipping")
-        return None
-
-    # Group by after_task_id
-    by_after: dict[int, list] = {}
-    for f in feedback:
-        at = f.after_task_id if hasattr(f, 'after_task_id') else f["after_task_id"]
-        by_after.setdefault(at, []).append(f)
-
-    after_ids = sorted(by_after)
-    mean_all = []
-    mean_old = []
-    current_task = []
-
-    for at in after_ids:
-        entries = by_after[at]
-        vals = []
-        old_vals = []
-        curr_val = None
-        for f in entries:
-            et = f.eval_task_id if hasattr(f, 'eval_task_id') else f["eval_task_id"]
-            v = getattr(f, metric, None) or f.get(metric, f.get("oa", 0))
-            vals.append(v)
-            if et < at:
-                old_vals.append(v)
-            elif et == at:
-                curr_val = v
-        mean_all.append(np.mean(vals) * 100 if vals else 0)
-        mean_old.append(np.mean(old_vals) * 100 if old_vals else np.nan)
-        current_task.append(curr_val * 100 if curr_val is not None else np.nan)
-
-    fig, ax = plt.subplots(figsize=(7, 4))
-    ax.plot(after_ids, mean_all, "-o", color=_PALETTE[0], linewidth=2,
-            markersize=6, label="Mean (all seen tasks)")
-    if not all(np.isnan(v) for v in mean_old):
-        ax.plot(after_ids, mean_old, "--s", color=_PALETTE[3], linewidth=2,
-                markersize=5, label="Mean (old tasks only)")
-    if not all(np.isnan(v) for v in current_task):
-        ax.plot(after_ids, current_task, ":^", color=_PALETTE[2], linewidth=2,
-                markersize=5, label="Current task (plasticity)")
-
-    ax.set_xlabel("After learning task")
-    ax.set_ylabel(f"{metric.upper()} (%)")
-    ax.set_xticks(after_ids)
-    method = getattr(result, "method_name", "")
-    proto = getattr(result, "protocol_name", "")
-    ax.set_title(f"Task Feedback — {method} / {proto}", fontsize=11)
-    ax.legend(loc="lower left", fontsize=9)
-
-    if save:
-        Path(save).parent.mkdir(parents=True, exist_ok=True)
-        for ext in (".pdf", ".png"):
-            fig.savefig(str(Path(save).with_suffix(ext)),
-                        bbox_inches="tight", dpi=300)
-        print(f"[plot] saved → {save}")
-    plt.tight_layout()
+        _save_publication_figure(fig, save)
     return fig
 
 
