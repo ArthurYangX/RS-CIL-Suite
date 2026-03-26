@@ -26,7 +26,7 @@ class LUCIR(CILMethod):
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
                  d=128, epochs=50, lr=1e-3,
-                 memory_size=2000, lf_lambda=5.0, mr_lambda=1.0,
+                 memory_size=2000, lf_lambda=1.0, mr_lambda=1.0,
                  K=2, margin=0.5, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)

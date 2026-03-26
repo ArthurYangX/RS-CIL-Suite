@@ -31,14 +31,18 @@ class LwF(CILMethod):
         self.lwf_lambda = lwf_lambda
         self.head = nn.Linear(d, num_classes).to(device)
         self._old_model: nn.Module | None = None
+        self._old_head: nn.Linear | None = None
         self._old_classes: list[int] = []
 
     def before_task(self, task: Task):
         super().before_task(task)
-        # Snapshot old model before training new task
+        # Snapshot old model AND old head before training new task
         if self._old_classes:
             self._old_model = deepcopy(self.model).eval()
+            self._old_head = deepcopy(self.head).eval()
             for p in self._old_model.parameters():
+                p.requires_grad_(False)
+            for p in self._old_head.parameters():
                 p.requires_grad_(False)
 
     def train_task(self, task: Task, train_loader: DataLoader):
@@ -59,10 +63,10 @@ class LwF(CILMethod):
 
                 # KD on old classes
                 loss_kd = torch.tensor(0.0, device=self.device)
-                if self._old_model is not None and self._old_classes:
+                if self._old_model is not None and self._old_head is not None and self._old_classes:
                     with torch.no_grad():
                         old_feat = self._old_model(xh, xl)
-                    old_logits = self.head(old_feat)[:, self._old_classes]
+                        old_logits = self._old_head(old_feat)[:, self._old_classes]
                     new_logits = self.head(feat)[:, self._old_classes]
                     loss_kd = F.kl_div(
                         F.log_softmax(new_logits / self.T, dim=1),
@@ -98,14 +102,21 @@ class LwF(CILMethod):
         state = {"head": self.head.state_dict()}
         if self._old_model is not None:
             state["_old_model"] = self._old_model.state_dict()
+        if self._old_head is not None:
+            state["_old_head"] = self._old_head.state_dict()
         return state
 
     def _load_method_state(self, ckpt: dict):
         self.head.load_state_dict(ckpt["head"])
         if "_old_model" in ckpt:
-            from copy import deepcopy
             self._old_model = deepcopy(self.model)
             self._old_model.load_state_dict(ckpt["_old_model"])
             self._old_model.eval()
             for p in self._old_model.parameters():
+                p.requires_grad_(False)
+        if "_old_head" in ckpt:
+            self._old_head = deepcopy(self.head)
+            self._old_head.load_state_dict(ckpt["_old_head"])
+            self._old_head.eval()
+            for p in self._old_head.parameters():
                 p.requires_grad_(False)

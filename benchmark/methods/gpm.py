@@ -30,7 +30,7 @@ class GPM(CILMethod):
                  d: int = 128,
                  epochs: int = 50,
                  lr: float = 1e-3,
-                 threshold: float = 0.97,
+                 threshold: float = 0.90,
                  eps: float = 0.1, **kwargs):
         """
         Args:

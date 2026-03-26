@@ -55,6 +55,7 @@ class BiC(CILMethod):
 
         self.head = nn.Linear(d, num_classes, bias=True).to(device)
         self._old_model: nn.Module | None = None
+        self._old_head: nn.Linear | None = None
 
         # Exemplar store: {class_id: (hsi, lidar, labels)}
         self._exemplars: dict[int, tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = {}
@@ -128,7 +129,10 @@ class BiC(CILMethod):
         super().before_task(task)
         if len(self.seen_classes) > len(task.global_class_ids):
             self._old_model = deepcopy(self.model).eval()
+            self._old_head = deepcopy(self.head).eval()
             for p in self._old_model.parameters():
+                p.requires_grad_(False)
+            for p in self._old_head.parameters():
                 p.requires_grad_(False)
 
     def train_task(self, task: Task, train_loader: DataLoader):
@@ -153,15 +157,19 @@ class BiC(CILMethod):
                         if yi.item() in cids:
                             one_hot[bi, cids.index(yi.item())] = 1.0
 
-                    if self._old_model is not None:
+                    if self._old_model is not None and self._old_head is not None:
                         with torch.no_grad():
-                            old_logits = self.head(self._old_model(xh, xl))
+                            old_feat = self._old_model(xh, xl)
+                            old_logits = self._old_head(old_feat)
                         old_classes_idx = [cids.index(c) for c in cids
                                            if c not in task.global_class_ids
                                            and c < old_logits.shape[1]]
                         if old_classes_idx:
+                            old_cids = [c for c in cids
+                                        if c not in task.global_class_ids
+                                        and c < old_logits.shape[1]]
                             one_hot[:, old_classes_idx] = torch.sigmoid(
-                                old_logits[:, old_classes_idx]).detach()
+                                old_logits[:, old_cids]).detach()
 
                     loss = F.binary_cross_entropy_with_logits(logits, one_hot)
                     opt.zero_grad(); loss.backward(); opt.step()

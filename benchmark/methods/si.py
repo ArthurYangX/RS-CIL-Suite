@@ -21,7 +21,7 @@ class SI(CILMethod):
     name = "SI"
 
     def __init__(self, hsi_channels, lidar_channels, num_classes, device,
-                 d=128, epochs=50, lr=1e-3, si_lambda=1.0, epsilon=0.1, **kwargs):
+                 d=128, epochs=50, lr=1e-3, si_lambda=100.0, epsilon=0.1, **kwargs):
         encoder = SimpleEncoder(hsi_channels, lidar_channels, d)
         super().__init__(encoder, device, num_classes)
         self.d = d

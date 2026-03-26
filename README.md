@@ -247,6 +247,31 @@ python benchmark/run.py --protocol B1 --method icarl \
 
 ---
 
+## Weights & Biases Integration
+
+Track experiments with [wandb](https://wandb.ai):
+
+```bash
+# Enable wandb logging
+python benchmark/run.py --protocol A_IndianPines --method icarl \
+    --data_root ~/datasets/rs_cil --wandb --wandb_project rs-cil-benchmark
+
+# Custom project name
+python benchmark/run.py --protocol B1 --method der \
+    --data_root ~/datasets/rs_cil --wandb --wandb_project my-project
+```
+
+Logged metrics per task:
+- OA, AA, Kappa
+- Per-dataset accuracy
+- BWT, FWT (final)
+- Task-feedback matrix values
+- Confusion matrices (as wandb tables)
+
+> Requires `pip install wandb` and `wandb login`.
+
+---
+
 ## Multi-seed + Comparison
 
 ```bash

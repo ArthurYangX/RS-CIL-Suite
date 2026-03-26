@@ -1,4 +1,4 @@
 # SI — Synaptic Intelligence
 method:
-  si_lambda: 1.0
+  si_lambda: 100.0
   epsilon: 0.1
