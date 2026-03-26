@@ -117,12 +117,15 @@ class GDumb(CILMethod):
     # ── checkpoint ──────────────────────────────────────────────
     def _method_state(self) -> dict:
         return {
+            "head": self.head.state_dict(),
             "_buf_hsi": [t.cpu() for t in self._buf_hsi],
             "_buf_lidar": [t.cpu() for t in self._buf_lidar],
             "_buf_labels": [t.cpu() for t in self._buf_labels],
         }
 
     def _load_method_state(self, ckpt: dict):
+        if "head" in ckpt:
+            self.head.load_state_dict(ckpt["head"])
         self._buf_hsi = ckpt["_buf_hsi"]
         self._buf_lidar = ckpt["_buf_lidar"]
         self._buf_labels = ckpt["_buf_labels"]

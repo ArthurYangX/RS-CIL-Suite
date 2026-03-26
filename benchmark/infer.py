@@ -45,6 +45,7 @@ def _remap_labels(ds, local_ids, global_ids):
     new_ds.hsi    = ds.hsi
     new_ds.lidar  = ds.lidar
     new_ds.labels = new_labels
+    new_ds.coords = ds.coords
     return new_ds
 
 
@@ -77,10 +78,8 @@ def main():
     print(f"Device: {device}")
 
     # ── Protocol ──────────────────────────────────────────────────
-    if args.protocol not in PROTOCOLS:
-        raise ValueError(f"Unknown protocol '{args.protocol}'. "
-                         f"Available: {list(PROTOCOLS)}")
-    protocol = PROTOCOLS[args.protocol]
+    from benchmark.protocols.cil import get_protocol
+    protocol = get_protocol(args.protocol)
 
     # ── Load checkpoint metadata ──────────────────────────────────
     ckpt_meta = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
@@ -138,6 +137,7 @@ def main():
 
     # ── Inference ─────────────────────────────────────────────────
     all_preds, all_targets = [], []
+    per_dataset_outputs: dict[str, dict] = {}
     for eval_ds_name in protocol.dataset_order:
         eval_ds = datasets[eval_ds_name]
         ds_seen_local = [c for t in protocol.tasks[:task_id + 1]
@@ -155,6 +155,15 @@ def main():
         preds, targets = method.predict(test_loader)
         all_preds.append(preds)
         all_targets.append(targets)
+        per_dataset_outputs[eval_ds_name] = {
+            "preds": preds,
+            "targets": targets,
+            "coords": test_sub.coords.cpu().numpy() if getattr(test_sub, "coords", None) is not None else None,
+            "global_to_local": {
+                int(global_id): int(local_id)
+                for local_id, global_id in zip(ds_seen_local, ds_seen_global)
+            },
+        }
         # Per-dataset metrics
         from benchmark.eval.metrics import evaluate as eval_fn
         ds_result = eval_fn(preds, targets, ds_seen_global,
@@ -197,14 +206,18 @@ def main():
         try:
             from benchmark.eval.plots import plot_classification_map
             for ds_name_vis, ds_vis in datasets.items():
-                if hasattr(ds_vis, 'gt_map'):
+                if ds_name_vis in per_dataset_outputs and hasattr(ds_vis, 'gt_map'):
                     try:
+                        payload = per_dataset_outputs[ds_name_vis]
                         plot_classification_map(
                             gt_map=ds_vis.gt_map,
-                            preds=preds_np, targets=targets_np,
+                            preds=payload["preds"], targets=payload["targets"],
                             class_names=ds_vis.class_names,
+                            dataset_name=ds_name_vis,
                             title=f"{args.method} — {ds_name_vis}",
                             save=str(out_dir / f"map_{ds_name_vis}.pdf"),
+                            coords=payload["coords"],
+                            global_to_local=payload["global_to_local"],
                         )
                         print(f"  Map saved → {out_dir / f'map_{ds_name_vis}.pdf'}")
                     except Exception as e:

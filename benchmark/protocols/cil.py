@@ -165,11 +165,10 @@ PROTOCOL_B2 = build_cross_scene(
     num_classes=NUM_CLASSES,
 )
 
-# ── B3: add Houston2018 (5-dataset) ──────────────────────────────
+# ── B3: HSI-only cross-scene (3 datasets) ────────────────────────
 PROTOCOL_B3 = build_cross_scene(
-    dataset_order=["Trento", "Houston2013", "MUUFL", "Augsburg", "Houston2018"],
-    class_splits={"Trento": [2,2,2], "Houston2013": [5,5,5],
-                  "MUUFL": [4,4,3],  "Augsburg": [3,3,2], "Houston2018": [5,5,5,5]},
+    dataset_order=["IndianPines", "PaviaU", "Salinas"],
+    class_splits={"IndianPines": [4,4,4,4], "PaviaU": [3,3,3], "Salinas": [4,4,4,4]},
     num_classes=NUM_CLASSES,
 )
 
@@ -193,10 +192,12 @@ PROTOCOL_B4 = build_cross_scene(
     num_classes=NUM_CLASSES,
 )
 
-# ── B5: cross-modality (HSI-only datasets) ─────────────────────────
+# ── B5: HSI-only + SAR + UAV cross-scene (5 datasets) ────────────
 PROTOCOL_B5 = build_cross_scene(
-    dataset_order=["IndianPines", "PaviaU", "Salinas"],
-    class_splits={"IndianPines": [4,4,4,4], "PaviaU": [3,3,3], "Salinas": [4,4,4,4]},
+    dataset_order=["IndianPines", "PaviaU", "Salinas", "Berlin", "WHU-Hi-LongKou"],
+    class_splits={"IndianPines": [4,4,4,4], "PaviaU": [3,3,3],
+                  "Salinas": [4,4,4,4], "Berlin": [3,3,2],
+                  "WHU-Hi-LongKou": [3,3,3]},
     num_classes=NUM_CLASSES,
 )
 

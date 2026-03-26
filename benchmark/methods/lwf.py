@@ -99,7 +99,10 @@ class LwF(CILMethod):
 
     # ── checkpoint ──────────────────────────────────────────────
     def _method_state(self) -> dict:
-        state = {"head": self.head.state_dict()}
+        state = {
+            "head": self.head.state_dict(),
+            "_old_classes": self._old_classes,
+        }
         if self._old_model is not None:
             state["_old_model"] = self._old_model.state_dict()
         if self._old_head is not None:
@@ -108,6 +111,7 @@ class LwF(CILMethod):
 
     def _load_method_state(self, ckpt: dict):
         self.head.load_state_dict(ckpt["head"])
+        self._old_classes = ckpt.get("_old_classes", [])
         if "_old_model" in ckpt:
             self._old_model = deepcopy(self.model)
             self._old_model.load_state_dict(ckpt["_old_model"])

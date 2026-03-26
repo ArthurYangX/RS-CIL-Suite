@@ -4,8 +4,8 @@ Currently supported:
   - Trento       (6 classes)
   - Houston2013  (15 classes)
   - MUUFL        (11 classes)
-  - Houston2018  (20 classes)  ← stub, loader TBD
-  - Augsburg     (7 classes)   ← stub, loader TBD
+  - Houston2018  (20 classes)
+  - Augsburg     (8 classes)
 """
 from __future__ import annotations
 from pathlib import Path

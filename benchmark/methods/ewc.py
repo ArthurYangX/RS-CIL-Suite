@@ -116,5 +116,7 @@ class EWC(CILMethod):
 
     def _load_method_state(self, ckpt: dict):
         self.head.load_state_dict(ckpt["head"])
-        self._fisher = ckpt["_fisher"]
-        self._opt_params = ckpt["_opt_params"]
+        # Move Fisher tensors to correct device (saved on CPU)
+        self._fisher = [{n: f.to(self.device) for n, f in fd.items()}
+                        for fd in ckpt["_fisher"]]
+        self._opt_params = ckpt["_opt_params"]  # kept on CPU, moved in penalty loop

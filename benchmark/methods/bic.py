@@ -238,13 +238,18 @@ class BiC(CILMethod):
 
     # ── checkpoint ──────────────────────────────────────────────
     def _method_state(self) -> dict:
-        return {
+        state = {
             "head": self.head.state_dict(),
             "_exemplars": {c: (h.cpu(), l.cpu(), y.cpu())
                            for c, (h, l, y) in self._exemplars.items()},
             "_bias_layers": [bl.state_dict() for bl in self._bias_layers],
             "_task_class_ranges": self._task_class_ranges,
         }
+        if self._old_model is not None:
+            state["_old_model"] = self._old_model.state_dict()
+        if self._old_head is not None:
+            state["_old_head"] = self._old_head.state_dict()
+        return state
 
     def _load_method_state(self, ckpt: dict):
         self.head.load_state_dict(ckpt["head"])
@@ -255,3 +260,15 @@ class BiC(CILMethod):
             bl.load_state_dict(sd)
             self._bias_layers.append(bl)
         self._task_class_ranges = ckpt["_task_class_ranges"]
+        if "_old_model" in ckpt:
+            self._old_model = deepcopy(self.model)
+            self._old_model.load_state_dict(ckpt["_old_model"])
+            self._old_model.eval()
+            for p in self._old_model.parameters():
+                p.requires_grad_(False)
+        if "_old_head" in ckpt:
+            self._old_head = deepcopy(self.head)
+            self._old_head.load_state_dict(ckpt["_old_head"])
+            self._old_head.eval()
+            for p in self._old_head.parameters():
+                p.requires_grad_(False)
