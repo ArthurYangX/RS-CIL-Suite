@@ -102,6 +102,16 @@ def main():
     _cli_defaults = {"patch_size": 7, "pca_components": 36}
 
     if run_meta:
+        # Validate protocol and method match
+        if "protocol" in run_meta and run_meta["protocol"] != args.protocol:
+            print(f"[WARN] CLI --protocol={args.protocol} differs from "
+                  f"checkpoint protocol={run_meta['protocol']}")
+        if "method" in run_meta and run_meta["method"] != args.method:
+            raise ValueError(
+                f"CLI --method={args.method} does not match checkpoint "
+                f"method={run_meta['method']}. Cannot load weights into "
+                f"a different method architecture.")
+
         # Use checkpoint values as defaults when CLI is at its default
         if args.patch_size == _cli_defaults["patch_size"] and "patch_size" in run_meta:
             _patch_size = run_meta["patch_size"]
@@ -109,6 +119,7 @@ def main():
             _pca_components = run_meta["pca_components"]
         if "backbone" in run_meta:
             _backbone = run_meta["backbone"]
+
         # Warn on mismatch (only when CLI was explicitly set to non-default)
         for key, cli_val, meta_val, default in [
             ("patch_size", args.patch_size, run_meta.get("patch_size"), _cli_defaults["patch_size"]),
@@ -143,15 +154,25 @@ def main():
         raise ValueError(f"Unknown method '{args.method}'. "
                          f"Available: {sorted(registry)}")
 
-    cfg = load_config(args.method, config_path=args.config,
-                      cli_overrides=args.opts)
+    # Prefer checkpoint's saved config; fall back to loading from disk
+    if run_meta.get("config"):
+        cfg = run_meta["config"]
+        print(f"[INFO] Using config from checkpoint run_meta")
+    else:
+        cfg = load_config(args.method, config_path=args.config,
+                          cli_overrides=args.opts)
+    # CLI --opts and --config can still override checkpoint config
+    if args.opts or args.config:
+        cli_cfg = load_config(args.method, config_path=args.config,
+                              cli_overrides=args.opts)
+        cfg.update(cli_cfg)
+
     flat_cfg = flatten_config(cfg)
 
     # Map config key to method kwarg
     if "_backbone" in flat_cfg:
         flat_cfg["backbone"] = flat_cfg.pop("_backbone")
-    # Checkpoint backbone overrides config default (config always has
-    # simple_encoder from defaults.yaml, so "not in" never triggers)
+    # Checkpoint backbone overrides config default
     if _backbone:
         if flat_cfg.get("backbone") != _backbone:
             print(f"[INFO] Using backbone '{_backbone}' from checkpoint "
