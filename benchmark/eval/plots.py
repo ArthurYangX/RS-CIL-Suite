@@ -511,11 +511,51 @@ def plot_forgetting_matrix(result, metric: str = "oa",
                             save: str | None = None):
     """Heatmap: rows = tasks evaluated, cols = after which task.
 
-    If task-feedback artifacts are available, this renders the true
-    task-aware matrix. Otherwise it falls back to the legacy diagonal-only
-    approximation for backward compatibility.
+    If task-feedback data is available, delegates to the full
+    task-accuracy matrix.  Otherwise renders the legacy diagonal-only
+    approximation (one value per task — the aggregate metric at that
+    training step), preserving old behavior.
     """
-    return plot_task_accuracy_matrix(result, metric=metric, save=save)
+    feedback = getattr(result, "task_feedback", None) or \
+               getattr(result, "_task_feedback_raw", None)
+    if feedback:
+        return plot_task_accuracy_matrix(result, metric=metric, save=save)
+
+    # Legacy fallback: diagonal-only heatmap from aggregate task_results
+    _set_style()
+    plt = _mpl()
+
+    task_results = getattr(result, "task_results", [])
+    n = len(task_results)
+    if n < 2:
+        print("[plot_forgetting_matrix] need ≥2 tasks, skipping")
+        return None
+
+    vals = np.array([getattr(r, metric, 0) * (100 if metric != "kappa" else 1)
+                     for r in task_results])
+    matrix = np.full((n, n), np.nan)
+    for j in range(n):
+        matrix[j, j] = vals[j]
+
+    fig, ax = plt.subplots(figsize=(max(5, n * 1.1), max(4, n * 0.9)))
+    _sns().heatmap(
+        matrix, ax=ax, annot=True, fmt=".1f",
+        cmap="RdYlGn", vmin=0 if metric != "kappa" else -0.1,
+        vmax=100 if metric != "kappa" else 1,
+        linewidths=0.5, linecolor="white",
+        mask=np.isnan(matrix),
+        cbar_kws={"label": f"{metric.upper()} (%)"},
+    )
+    ax.set_xlabel("After task")
+    ax.set_ylabel("Task evaluated")
+    method = getattr(result, "method_name", "")
+    proto = getattr(result, "protocol_name", "")
+    ax.set_title(f"Forgetting matrix — {method} / {proto}")
+
+    if save:
+        _save_publication_figure(fig, save)
+    plt.tight_layout()
+    return fig
 
 
 def plot_task_accuracy_matrix(
@@ -566,8 +606,8 @@ def plot_task_accuracy_matrix(
         annot=annotations,
         fmt="",
         cmap="YlGnBu",
-        vmin=0 if metric == "kappa" else max(0, np.nanmin(matrix) - 5),
-        vmax=1 if metric == "kappa" else min(100, np.nanmax(matrix) + 5),
+        vmin=min(-0.1, np.nanmin(matrix) - 0.05) if metric == "kappa" else max(0, np.nanmin(matrix) - 5),
+        vmax=max(1.0, np.nanmax(matrix) + 0.05) if metric == "kappa" else min(100, np.nanmax(matrix) + 5),
         linewidths=0.6,
         linecolor="white",
         mask=np.isnan(matrix),
@@ -726,7 +766,11 @@ def plot_suite(results_dir: str | Path, out_dir: str | Path = "figs/",
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    by_protocol: dict[str, dict[str, list[_SimpleResult]]] = {}
+    # First pass: collect all JSONs, separating per-seed runs from summaries
+    per_seed_files: dict[str, dict[str, list]] = {}   # proto → method → [data]
+    summary_files:  dict[str, dict[str, list]] = {}   # proto → method → [data]
+    all_json_files: list[tuple[Path, dict]] = []
+
     for f in sorted(results_dir.glob("**/*.json")):
         try:
             data = json.loads(f.read_text())
@@ -734,17 +778,29 @@ def plot_suite(results_dir: str | Path, out_dir: str | Path = "figs/",
             continue
         if "method" not in data or "protocol" not in data:
             continue
-        # Skip multi-seed summary files when per-seed files are also present.
-        if "seeds" in data and "seed" not in data and not data.get("task_evals"):
-            continue
-
         proto = data.get("protocol", "unknown")
         method = data.get("method", "unknown")
         if protocol_filter and proto != protocol_filter:
             continue
-        by_protocol.setdefault(proto, {}).setdefault(method, []).append(
-            _json_to_result(data, proto, method, source_file=f)
-        )
+
+        is_summary = "seeds" in data and "seed" not in data
+        target = summary_files if is_summary else per_seed_files
+        target.setdefault(proto, {}).setdefault(method, []).append((f, data))
+
+    # Second pass: prefer per-seed files; fall back to summaries
+    by_protocol: dict[str, dict[str, list[_SimpleResult]]] = {}
+    for proto in set(list(per_seed_files) + list(summary_files)):
+        per_seed_methods = per_seed_files.get(proto, {})
+        summary_methods  = summary_files.get(proto, {})
+        all_methods = set(list(per_seed_methods) + list(summary_methods))
+        for method in all_methods:
+            entries = per_seed_methods.get(method)
+            if not entries:
+                entries = summary_methods.get(method, [])
+            for f, data in entries:
+                by_protocol.setdefault(proto, {}).setdefault(method, []).append(
+                    _json_to_result(data, proto, method, source_file=f)
+                )
 
     if not by_protocol:
         print(f"[plot_suite] no JSON files found in {results_dir}")
