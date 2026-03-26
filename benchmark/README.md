@@ -340,16 +340,3 @@ tests/                    # 64 unit tests
 
 We thank all dataset providers for making their data publicly available. This benchmark builds on ideas from [PyCIL](https://github.com/G-U-N/PyCIL), [FACIL](https://github.com/mmasana/FACIL), and the CIL survey by Zhou et al. (TPAMI 2024).
 
----
-
-## Citation
-
-If you find this benchmark useful, please cite:
-
-```bibtex
-@misc{rs-cil-bench,
-  title={RS-CIL-Bench: A Standardized Class-Incremental Learning Benchmark for Remote Sensing Hyperspectral Imagery},
-  year={2025},
-  url={https://github.com/ArthurYangX/RS-CIL-Bench}
-}
-```
