@@ -320,6 +320,13 @@ def run(args):
         "train_ratio": train_ratio,
         "backbone": cfg.get("model", {}).get("backbone", "simple_encoder") if cfg else "simple_encoder",
         "config": cfg,
+        # Freeze protocol definition so checkpoint is self-describing
+        # even if custom YAML is later modified or moved
+        "protocol_tasks": [
+            {"task_id": t.task_id, "dataset": t.dataset_name,
+             "class_ids": t.class_ids, "global_class_ids": t.global_class_ids}
+            for t in protocol.tasks
+        ],
     }
     ckpt_dir = None
     if getattr(args, "save_checkpoints", False):

@@ -104,8 +104,10 @@ def main():
     if run_meta:
         # Validate protocol and method match
         if "protocol" in run_meta and run_meta["protocol"] != args.protocol:
-            print(f"[WARN] CLI --protocol={args.protocol} differs from "
-                  f"checkpoint protocol={run_meta['protocol']}")
+            raise ValueError(
+                f"CLI --protocol={args.protocol} does not match checkpoint "
+                f"protocol={run_meta['protocol']}. Use the same protocol "
+                f"that was used during training.")
         if "method" in run_meta and run_meta["method"] != args.method:
             raise ValueError(
                 f"CLI --method={args.method} does not match checkpoint "
@@ -157,18 +159,20 @@ def main():
         raise ValueError(f"Unknown method '{args.method}'. "
                          f"Available: {sorted(registry)}")
 
-    # Prefer checkpoint's saved config; fall back to loading from disk
+    # Prefer checkpoint's saved config; fall back to loading from disk.
+    # CLI --opts and --config deep-merge on top (not shallow replace).
+    from benchmark.config import _deep_merge
     if run_meta.get("config"):
         cfg = run_meta["config"]
         print(f"[INFO] Using config from checkpoint run_meta")
+        # Deep-merge CLI overrides on top of checkpoint config
+        if args.opts or args.config:
+            cli_cfg = load_config(args.method, config_path=args.config,
+                                  cli_overrides=args.opts)
+            cfg = _deep_merge(cfg, cli_cfg)
     else:
         cfg = load_config(args.method, config_path=args.config,
                           cli_overrides=args.opts)
-    # CLI --opts and --config can still override checkpoint config
-    if args.opts or args.config:
-        cli_cfg = load_config(args.method, config_path=args.config,
-                              cli_overrides=args.opts)
-        cfg.update(cli_cfg)
 
     flat_cfg = flatten_config(cfg)
 
