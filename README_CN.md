@@ -82,7 +82,9 @@ python benchmark/compare.py results/ --latex
 | [WHU-Hi-LongKou](https://huggingface.co/datasets/danaroth/whu_hi) | 无人机 HSI | 9 | 550 x 400 x 270 | -- |
 
 预处理流程（仅首次运行，结果自动缓存）：
-`原始 .mat` &rarr; PCA（36 波段）&rarr; 归一化 &rarr; 镜像填充 &rarr; 7x7 patch 提取 &rarr; `.npz` 缓存
+`原始 .mat` &rarr; PCA（默认 36 波段）&rarr; 归一化 &rarr; 镜像填充 &rarr; patch 提取（默认 7x7）&rarr; `.npz` 缓存
+
+Patch 尺寸和 PCA 维度可通过 `--patch_size` 和 `--pca_components` 自定义。
 
 ---
 

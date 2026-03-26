@@ -83,7 +83,9 @@ All 10 datasets download automatically via `download.py` (no registration requir
 | [WHU-Hi-LongKou](https://huggingface.co/datasets/danaroth/whu_hi) | UAV HSI | 9 | 550 x 400 x 270 | -- |
 
 Each dataset is preprocessed once and cached:
-`raw .mat` &rarr; PCA (36 bands) &rarr; normalize &rarr; mirror pad &rarr; 7x7 patches &rarr; `.npz` cache
+`raw .mat` &rarr; PCA (default 36 bands) &rarr; normalize &rarr; mirror pad &rarr; patch extraction (default 7x7) &rarr; `.npz` cache
+
+Patch size and PCA components are configurable via `--patch_size` and `--pca_components`.
 
 ---
 
