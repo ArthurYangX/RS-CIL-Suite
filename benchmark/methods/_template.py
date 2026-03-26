@@ -1,4 +1,4 @@
-"""Template for adding a new CIL method to RS-CIL-Bench.
+"""Template for adding a new CIL method to RS-CIL-Suite.
 
 How to add your method:
   1. Copy this file → benchmark/methods/your_method.py

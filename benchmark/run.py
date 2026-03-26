@@ -1,4 +1,4 @@
-"""RS-CIL Benchmark runner.
+"""RS-CIL Suite runner.
 
 Usage:
     python benchmark/run.py --protocol B1 --method finetune \
@@ -179,7 +179,7 @@ def _init_wandb(args, cfg: dict):
         # Merge in method config for hyperparameter comparison
         wandb_config.update(flatten_config(cfg))
         run = wandb.init(
-            project=getattr(args, "wandb_project", "rs-cil-benchmark"),
+            project=getattr(args, "wandb_project", "rs-cil-suite"),
             name=f"{args.method}_{args.protocol}_seed{args.seed}",
             config=wandb_config,
             reinit=True,
@@ -591,7 +591,7 @@ def _build_method(name: str, protocol: CILProtocol, device, datasets,
 # ── CLI ───────────────────────────────────────────────────────────
 
 def _build_parser():
-    p = argparse.ArgumentParser(description="RS-CIL Benchmark Runner")
+    p = argparse.ArgumentParser(description="RS-CIL Suite Runner")
     p.add_argument("--protocol",      default="B1",
                    help=f"Protocol key. Available: {list(PROTOCOLS)}")
     p.add_argument("--method",        default="ncm",
@@ -620,8 +620,8 @@ def _build_parser():
     # Wandb
     p.add_argument("--wandb",         action="store_true",
                    help="Enable Weights & Biases logging")
-    p.add_argument("--wandb_project", default="rs-cil-benchmark",
-                   help="W&B project name (default: rs-cil-benchmark)")
+    p.add_argument("--wandb_project", default="rs-cil-suite",
+                   help="W&B project name (default: rs-cil-suite)")
     # Plotting
     p.add_argument("--plot",          action="store_true",
                    help="Generate figures after run (requires matplotlib/seaborn)")

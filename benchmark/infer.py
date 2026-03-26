@@ -50,7 +50,7 @@ def _remap_labels(ds, local_ids, global_ids):
 
 
 def main():
-    p = argparse.ArgumentParser(description="RS-CIL Benchmark — Inference")
+    p = argparse.ArgumentParser(description="RS-CIL Suite — Inference")
     p.add_argument("--checkpoint", required=True,
                    help="Path to .pt checkpoint file")
     p.add_argument("--protocol",   required=True,

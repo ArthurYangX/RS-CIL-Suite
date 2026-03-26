@@ -265,7 +265,7 @@ def generate_leaderboard_file(results_dir: str, output: str = "LEADERBOARD.md"):
     buf = StringIO()
     sys.stdout = buf
 
-    print("# RS-CIL-Bench Leaderboard\n")
+    print("# RS-CIL-Suite Leaderboard\n")
     print("Auto-generated from experiment results.\n")
 
     for proto in sorted(by_proto):

@@ -1,7 +1,7 @@
 <p align="center">
-  <h1 align="center">RS-CIL-Bench</h1>
+  <h1 align="center">RS-CIL-Suite</h1>
   <p align="center">
-    A Standardized Class-Incremental Learning Benchmark<br>for Remote Sensing Hyperspectral Imagery
+    A Standardized Class-Incremental Learning Suite<br>for Remote Sensing Hyperspectral Imagery
   </p>
 </p>
 
@@ -264,7 +264,7 @@ wandb login
 
 # 4. Run with tracking enabled
 python benchmark/run.py --protocol A_IndianPines --method icarl \
-    --data_root ~/data --wandb --wandb_project rs-cil-benchmark
+    --data_root ~/data --wandb --wandb_project rs-cil-suite
 ```
 
 All metrics (OA, AA, Kappa, BWT per task) are automatically logged to your wandb dashboard.
@@ -392,10 +392,10 @@ tests/                    # 64 unit tests
 ```bibtex
 @misc{yang2026rscilbench,
     author       = {Yang, Xiao},
-    title        = {RS-CIL-Bench: A Standardized Class-Incremental Learning Benchmark for Remote Sensing Hyperspectral Imagery},
+    title        = {RS-CIL-Suite: A Standardized Class-Incremental Learning Suite for Remote Sensing Hyperspectral Imagery},
     year         = {2026},
     organization = {GitHub},
-    url          = {https://github.com/ArthurYangX/RS-CIL-Bench},
+    url          = {https://github.com/ArthurYangX/RS-CIL-Suite},
 }
 ```
 

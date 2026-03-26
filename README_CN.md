@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">RS-CIL-Bench</h1>
+  <h1 align="center">RS-CIL-Suite</h1>
   <p align="center">
     面向遥感高光谱图像的标准化类增量学习基准平台
   </p>
@@ -263,7 +263,7 @@ wandb login
 
 # 4. 启用追踪运行实验
 python benchmark/run.py --protocol A_IndianPines --method icarl \
-    --data_root ~/data --wandb --wandb_project rs-cil-benchmark
+    --data_root ~/data --wandb --wandb_project rs-cil-suite
 ```
 
 所有指标（每个任务的 OA、AA、Kappa、BWT）会自动记录到你的 wandb 仪表盘。
@@ -391,10 +391,10 @@ tests/                    # 64 个单元测试
 ```bibtex
 @misc{yang2026rscilbench,
     author       = {Yang, Xiao},
-    title        = {RS-CIL-Bench: A Standardized Class-Incremental Learning Benchmark for Remote Sensing Hyperspectral Imagery},
+    title        = {RS-CIL-Suite: A Standardized Class-Incremental Learning Benchmark for Remote Sensing Hyperspectral Imagery},
     year         = {2026},
     organization = {GitHub},
-    url          = {https://github.com/ArthurYangX/RS-CIL-Bench},
+    url          = {https://github.com/ArthurYangX/RS-CIL-Suite},
 }
 ```
 

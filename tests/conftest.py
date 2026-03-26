@@ -1,4 +1,4 @@
-"""Shared fixtures for RS-CIL-Bench tests."""
+"""Shared fixtures for RS-CIL-Suite tests."""
 from __future__ import annotations
 
 import sys
