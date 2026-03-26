@@ -317,6 +317,7 @@ def run(args):
         "seed": args.seed,
         "patch_size": args.patch_size,
         "pca_components": args.pca_components,
+        "train_ratio": train_ratio,
         "backbone": cfg.get("model", {}).get("backbone", "simple_encoder") if cfg else "simple_encoder",
         "config": cfg,
     }
@@ -566,13 +567,10 @@ def _build_method(name: str, protocol: CILProtocol, device, datasets,
                          f"Available: {sorted(registry)}")
 
     total  = protocol.total_classes
-    hsi_ch = pca_components  # matches --pca_components
 
-    # Determine LiDAR channel count from actual data
-    lid_ch = max(
-        ds.train.lidar.shape[1]
-        for ds in datasets.values()
-    )
+    # Use actual data channels (PCA may clip to min(requested, C, H*W))
+    hsi_ch = max(ds.train.hsi.shape[1] for ds in datasets.values())
+    lid_ch = max(ds.train.lidar.shape[1] for ds in datasets.values())
 
     kwargs = dict(hsi_channels=hsi_ch, lidar_channels=lid_ch,
                   num_classes=total, device=device)

@@ -130,12 +130,15 @@ def main():
                       f"checkpoint run_meta {key}={meta_val}")
 
     # ── Load datasets ─────────────────────────────────────────────
+    _train_ratio = run_meta.get("train_ratio") if run_meta else None
     datasets = {}
     for ds_name in protocol.dataset_order:
         root = Path(args.data_root) / ds_name
-        datasets[ds_name] = get_dataset(ds_name, root=root,
-                                        patch_size=_patch_size,
-                                        pca_components=_pca_components)
+        ds_kwargs = dict(root=root, patch_size=_patch_size,
+                         pca_components=_pca_components)
+        if _train_ratio is not None:
+            ds_kwargs["train_ratio"] = _train_ratio
+        datasets[ds_name] = get_dataset(ds_name, **ds_kwargs)
         info = datasets[ds_name].info
         print(f"  [{ds_name}] {info.num_classes} classes | "
               f"test={len(datasets[ds_name].test)}")
@@ -179,7 +182,8 @@ def main():
                   f"(config had '{flat_cfg.get('backbone', 'N/A')}')")
         flat_cfg["backbone"] = _backbone
 
-    hsi_ch = _pca_components
+    # Use actual data channels (PCA may have clipped below requested)
+    hsi_ch = max(ds.train.hsi.shape[1] for ds in datasets.values())
     lid_ch = lid_ch_max
     kwargs = dict(hsi_channels=hsi_ch, lidar_channels=lid_ch,
                   num_classes=protocol.total_classes, device=device)

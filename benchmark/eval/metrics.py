@@ -179,12 +179,10 @@ def evaluate(
         if mask.sum() > 0:
             per_dataset[ds] = average_accuracy(preds[mask], targets[mask], ds_classes)
 
-    avg_aa = float(np.mean(list(per_dataset.values()))) if per_dataset else 0.0
-
     return TaskResult(
         task_id=-1,   # caller sets this
         per_dataset=per_dataset,
-        avg_aa=avg_aa,
+        avg_aa=aa,    # true per-class AA, not dataset-mean
         oa=oa,
         kappa=kappa,
     )

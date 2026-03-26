@@ -71,11 +71,28 @@ def build_cross_scene(
         dataset_order = ["Trento", "Houston2013", "MUUFL"]
         class_splits  = {"Trento": [2,2,2], "Houston2013": [5,5,5], "MUUFL": [4,4,3]}
     """
+    # Validate class_splits
+    for ds in dataset_order:
+        if ds not in class_splits:
+            raise ValueError(f"class_splits missing entry for dataset '{ds}'")
+        if ds not in num_classes:
+            raise ValueError(f"num_classes missing entry for dataset '{ds}'")
+        split_sum = sum(class_splits[ds])
+        if split_sum != num_classes[ds]:
+            raise ValueError(
+                f"class_splits['{ds}'] sums to {split_sum} but "
+                f"num_classes['{ds}']={num_classes[ds]}")
+        if any(n <= 0 for n in class_splits[ds]):
+            raise ValueError(
+                f"class_splits['{ds}'] contains non-positive values: "
+                f"{class_splits[ds]}")
+
     offsets: Dict[str, int] = {}
     off = 0
     for ds in dataset_order:
         offsets[ds] = off
         off += num_classes[ds]
+    total_classes = off
 
     tasks = []
     task_id = 0
@@ -88,6 +105,11 @@ def build_cross_scene(
                               class_ids=local_ids, global_class_ids=global_ids))
             local += n
             task_id += 1
+
+    # Sanity check: max global ID must be < total_classes
+    max_gid = max(gid for t in tasks for gid in t.global_class_ids)
+    assert max_gid + 1 == total_classes, \
+        f"max global_class_id={max_gid} but total_classes={total_classes}"
 
     return CILProtocol(
         name=f"CrossScene({'→'.join(dataset_order)})",
@@ -109,8 +131,13 @@ def build_within_scene(
     Example:
         build_within_scene("Houston2013", [5, 5, 5], 15)
     """
-    assert sum(class_splits) == num_classes, \
-        f"class_splits {class_splits} must sum to {num_classes}"
+    if any(n <= 0 for n in class_splits):
+        raise ValueError(
+            f"class_splits contains non-positive values: {class_splits}")
+    if sum(class_splits) != num_classes:
+        raise ValueError(
+            f"class_splits {class_splits} sums to {sum(class_splits)} "
+            f"but num_classes={num_classes}")
 
     tasks = []
     local = 0

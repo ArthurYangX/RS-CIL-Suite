@@ -48,6 +48,9 @@ def load_results(paths: list[str]) -> list[dict]:
                     results.append(d)
                 except (json.JSONDecodeError, KeyError):
                     continue
+    # Filter out multi-seed summary files (have "seeds" key, not "seed")
+    # to avoid double-counting when per-seed files also exist
+    results = [r for r in results if "seeds" not in r]
     return results
 
 
