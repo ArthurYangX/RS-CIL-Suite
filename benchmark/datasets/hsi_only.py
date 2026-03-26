@@ -57,7 +57,7 @@ class IndianPines(RSDataset):
     def _preprocess(self):
         hsi = loadmat(self.root / "Indian_pines_corrected.mat")["indian_pines_corrected"].astype(np.float32)
         gt  = self.gt_map
-        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
+        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=self.train_ratio)
         lidar = _zero_lidar(hsi)
         return preprocess_hsi_lidar(hsi, lidar, tr, te,
                                     self.INFO.num_classes,
@@ -91,7 +91,7 @@ class PaviaU(RSDataset):
     def _preprocess(self):
         hsi = loadmat(self.root / "PaviaU.mat")["paviaU"].astype(np.float32)
         gt  = self.gt_map
-        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
+        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=self.train_ratio)
         lidar = _zero_lidar(hsi)
         return preprocess_hsi_lidar(hsi, lidar, tr, te,
                                     self.INFO.num_classes,
@@ -129,7 +129,7 @@ class Salinas(RSDataset):
     def _preprocess(self):
         hsi = loadmat(self.root / "Salinas_corrected.mat")["salinas_corrected"].astype(np.float32)
         gt  = self.gt_map
-        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
+        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=self.train_ratio)
         lidar = _zero_lidar(hsi)
         return preprocess_hsi_lidar(hsi, lidar, tr, te,
                                     self.INFO.num_classes,
@@ -223,7 +223,7 @@ class WHUHiLongKou(RSDataset):
             hdr = str(self.root / "WHU-Hi-LongKou.hdr")
             hsi = np.array(spectral.open_image(hdr).load(), dtype=np.float32)
             gt = self.gt_map
-        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
+        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=self.train_ratio)
         lidar = _zero_lidar(hsi)
         return preprocess_hsi_lidar(hsi, lidar, tr, te,
                                     self.INFO.num_classes,

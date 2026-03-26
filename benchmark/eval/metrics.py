@@ -36,10 +36,10 @@ class BenchmarkResult:
     task_results: List[TaskResult] = field(default_factory=list)
 
     # Derived (filled by compute_cl_metrics)
-    forgetting:  Dict[str, float] = field(default_factory=dict)   # per dataset
-    plasticity:  Dict[str, float] = field(default_factory=dict)   # per dataset, AA when first seen
-    bwt: float = 0.0    # backward transfer (mean forgetting, negative = bad)
-    fwt: float = 0.0    # forward transfer  (mean AA at first introduction)
+    forgetting:  Dict[str, float] = field(default_factory=dict)   # per dataset: peak − final (≥0)
+    plasticity:  Dict[str, float] = field(default_factory=dict)   # per dataset: AA when first seen
+    bwt: float = 0.0    # backward transfer: final − peak (≤0 means forgetting)
+    fwt: float = 0.0    # mean first-task AA (plasticity proxy)
     final_aa:    float = 0.0
     final_oa:    float = 0.0
     final_kappa: float = 0.0
@@ -71,10 +71,10 @@ class BenchmarkResult:
                 peak = max(accs)
                 self.forgetting[ds] = peak - final.per_dataset.get(ds, 0.0)
 
-        self.bwt = float(np.mean(list(self.forgetting.values()))) if self.forgetting else 0.0
+        # BWT = final − peak (negative = forgetting, standard CL convention)
+        self.bwt = -float(np.mean(list(self.forgetting.values()))) if self.forgetting else 0.0
 
-        # Plasticity: AA at first introduction (FWT proxy — how well the model
-        # generalises to a new scene/class set without prior exposure)
+        # Plasticity: AA at first introduction
         self.plasticity = dict(self._first_aa)
         self.fwt = float(np.mean(list(self.plasticity.values()))) if self.plasticity else 0.0
 
@@ -86,8 +86,8 @@ class BenchmarkResult:
             f"  Final OA   : {self.final_oa*100:.2f}%",
             f"  Final AA   : {self.final_aa*100:.2f}%",
             f"  Final Kappa: {self.final_kappa:.4f}",
-            f"  BWT (Forgetting)  : {self.bwt*100:.2f}pp  (lower = less forgetting)",
-            f"  FWT (Plasticity)  : {self.fwt*100:.2f}%   (higher = faster adaptation)",
+            f"  BWT : {self.bwt*100:.2f}pp  (negative = forgetting)",
+            f"  FWT : {self.fwt*100:.2f}%   (mean first-task AA)",
         ]
         for ds, f in self.forgetting.items():
             pl = self.plasticity.get(ds, 0.0)

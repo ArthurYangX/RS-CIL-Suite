@@ -165,12 +165,17 @@ def run(args):
     print(protocol.summary())
 
     # ── Load datasets ─────────────────────────────────────────────
+    # Custom train_ratio from protocol YAML (if set)
+    train_ratio = getattr(protocol, "train_ratio", None)
+
     datasets = {}
     for ds_name in protocol.dataset_order:
         root = Path(args.data_root) / ds_name if args.data_root else None
-        datasets[ds_name] = get_dataset(ds_name, root=root,
-                                        patch_size=args.patch_size,
-                                        pca_components=args.pca_components)
+        ds_kwargs = dict(root=root, patch_size=args.patch_size,
+                         pca_components=args.pca_components)
+        if train_ratio is not None:
+            ds_kwargs["train_ratio"] = train_ratio
+        datasets[ds_name] = get_dataset(ds_name, **ds_kwargs)
         info = datasets[ds_name].info
         print(f"  [{ds_name}] {info.num_classes} classes | "
               f"train={len(datasets[ds_name].train)} "
@@ -273,16 +278,10 @@ def run(args):
                             preds_np, targets_np, seen_classes,
                             class_to_dataset, datasets, protocol)
 
-        # ── Save checkpoint + predictions ─────────────────────────
+        # ── Save checkpoint ────────────────────────────────────────
         if ckpt_dir is not None:
             method.save_checkpoint(ckpt_dir / f"task_{task.task_id}.pt",
                                    task.task_id)
-            if all_preds:
-                np.savez_compressed(
-                    ckpt_dir / f"preds_task_{task.task_id}.npz",
-                    preds=preds_np, targets=targets_np,
-                    seen_classes=np.array(seen_classes),
-                )
 
     result.compute_cl_metrics()
     print(result.summary())
@@ -325,29 +324,9 @@ def run(args):
             print(f"[WARN] Plotting skipped: {e}")
 
     # ── Classification maps ───────────────────────────────────────
-    if getattr(args, "plot_maps", False) and ckpt_dir is not None:
-        try:
-            from benchmark.eval.plots import plot_classification_map
-            fig_dir = ckpt_dir / "maps"
-            fig_dir.mkdir(parents=True, exist_ok=True)
-            # Generate maps from saved predictions
-            for npz_file in sorted(ckpt_dir.glob("preds_task_*.npz")):
-                d = np.load(npz_file)
-                tid = int(npz_file.stem.split("_")[-1])
-                for ds_name_vis, ds_vis in datasets.items():
-                    if hasattr(ds_vis, 'gt_map'):
-                        try:
-                            plot_classification_map(
-                                gt_map=ds_vis.gt_map,
-                                preds=d["preds"], targets=d["targets"],
-                                class_names=ds_vis.class_names,
-                                title=f"{args.method} — {ds_name_vis} (task {tid})",
-                                save=str(fig_dir / f"map_{ds_name_vis}_task{tid}.pdf"),
-                            )
-                        except Exception as e:
-                            print(f"[WARN] Map generation failed for {ds_name_vis}: {e}")
-        except ImportError as e:
-            print(f"[WARN] Map plotting skipped: {e}")
+    # Note: per-dataset maps are generated in the eval loop above,
+    # saved as per-dataset .npz files. The --plot_maps flag is a
+    # placeholder for future per-dataset map generation from checkpoints.
 
     return result
 
@@ -401,7 +380,7 @@ def _build_method(name: str, protocol: CILProtocol, device, datasets,
 
 # ── CLI ───────────────────────────────────────────────────────────
 
-if __name__ == "__main__":
+def _build_parser():
     p = argparse.ArgumentParser(description="RS-CIL Benchmark Runner")
     p.add_argument("--protocol",      default="B1",
                    help=f"Protocol key. Available: {list(PROTOCOLS)}")
@@ -438,8 +417,17 @@ if __name__ == "__main__":
                    help="Generate figures after run (requires matplotlib/seaborn)")
     p.add_argument("--plot_maps",     action="store_true",
                    help="Generate classification maps (requires --save_checkpoints)")
-    args = p.parse_args()
+    return p
 
+
+def main_cli():
+    """Entry point for ``rs-cil-run`` console script."""
+    p = _build_parser()
+    args = p.parse_args()
+    _run_from_args(args)
+
+
+def _run_from_args(args):
     if args.seeds:
         # Multi-seed mode: run once per seed and average final metrics
         seeds = [int(s.strip()) for s in args.seeds.split(",")]
@@ -484,3 +472,7 @@ if __name__ == "__main__":
                 }, f, indent=2)
     else:
         run(args)
+
+
+if __name__ == "__main__":
+    main_cli()

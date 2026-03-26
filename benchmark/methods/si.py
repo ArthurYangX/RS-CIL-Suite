@@ -60,12 +60,12 @@ class SI(CILMethod):
         self._W = {n: torch.zeros_like(p) for n, p in self._all_named_params()}
 
         for ep in range(self.epochs):
-            total, n = 0.0, 0
+            total, cnt = 0.0, 0
             for xh, xl, y in train_loader:
                 xh, xl, y = xh.to(self.device), xl.to(self.device), y.to(self.device)
 
                 # Save old params for W update
-                p_old = {n: p.detach().clone() for n, p in self._all_named_params()}
+                p_old = {pn: p.detach().clone() for pn, p in self._all_named_params()}
 
                 logits = self.head(self.model(xh, xl))[:, cids]
                 mapped = torch.tensor([g2l[yi.item()] for yi in y], device=self.device)
@@ -73,26 +73,26 @@ class SI(CILMethod):
 
                 # SI penalty
                 loss_si = torch.tensor(0.0, device=self.device)
-                for n, p in self._all_named_params():
-                    if n in self._omega:
-                        theta_s = self._theta_star[n].to(self.device)
-                        loss_si += (self._omega[n].to(self.device) *
+                for pn, p in self._all_named_params():
+                    if pn in self._omega:
+                        theta_s = self._theta_star[pn].to(self.device)
+                        loss_si += (self._omega[pn].to(self.device) *
                                     (p - theta_s).pow(2)).sum()
 
                 loss = loss_ce + self.si_lambda * loss_si
                 opt.zero_grad(); loss.backward()
-
-                # Accumulate W: ∑ g * Δθ
-                for n, p in self._all_named_params():
-                    if p.grad is not None:
-                        delta = p.detach() - p_old[n]
-                        self._W[n] -= p.grad.detach() * delta
-
                 opt.step()
-                total += loss.item(); n += 1
+
+                # Accumulate W AFTER opt.step: Δθ = θ_new - θ_old
+                for pn, p in self._all_named_params():
+                    if p.grad is not None:
+                        delta = p.detach() - p_old[pn]
+                        self._W[pn] -= p.grad.detach() * delta
+
+                total += loss.item(); cnt += 1
 
             if (ep + 1) % 10 == 0:
-                print(f"    [SI] Epoch {ep+1}/{self.epochs}  loss={total/n:.4f}")
+                print(f"    [SI] Epoch {ep+1}/{self.epochs}  loss={total/cnt:.4f}")
 
     def after_task(self, task: Task, train_loader: DataLoader):
         """Update omega and theta_star."""

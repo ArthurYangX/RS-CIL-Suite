@@ -86,10 +86,12 @@ class RSDataset(ABC):
 
     INFO: DatasetInfo  # class-level metadata
 
-    def __init__(self, root: str | Path, patch_size: int = 7, pca_components: int = 36):
+    def __init__(self, root: str | Path, patch_size: int = 7,
+                 pca_components: int = 36, train_ratio: float = 0.1):
         self.root = Path(root)
         self.patch_size = patch_size
         self.pca_components = pca_components
+        self.train_ratio = train_ratio
         self._train: Optional[PatchDataset] = None
         self._test:  Optional[PatchDataset] = None
         self._gt_map: Optional[np.ndarray] = None
@@ -148,7 +150,7 @@ class RSDataset(ABC):
         cache_dir = self.root / ".cache"
         cache_dir.mkdir(exist_ok=True)
         key = hashlib.md5(
-            f"pca{self.pca_components}_patch{self.patch_size}".encode()
+            f"pca{self.pca_components}_patch{self.patch_size}_tr{self.train_ratio}".encode()
         ).hexdigest()[:12]
         cache_file = cache_dir / f"benchmark_{key}.npz"
 

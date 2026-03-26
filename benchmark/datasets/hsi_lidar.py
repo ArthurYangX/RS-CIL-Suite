@@ -42,7 +42,7 @@ class Trento(RSDataset):
         lidar = loadmat(self.root / "Italy_lidar.mat")["data"].astype(np.float32)
         gt    = self.gt_map
         from .hsi_only import _stratified_split
-        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
+        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=self.train_ratio)
         return preprocess_hsi_lidar(hsi, lidar, tr, te,
                                     self.INFO.num_classes,
                                     self.patch_size, self.pca_components)
@@ -121,7 +121,7 @@ class MUUFL(RSDataset):
             lidar_ch = lidar_ch[:, :, np.newaxis]
         gt = np.array(s.sceneLabels.labels, dtype=np.int32)
         from .hsi_only import _stratified_split
-        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=0.1)
+        tr, te = _stratified_split(gt, self.INFO.num_classes, train_ratio=self.train_ratio)
         return preprocess_hsi_lidar(hsi_cube, lidar_ch, tr, te,
                                     self.INFO.num_classes,
                                     self.patch_size, self.pca_components)

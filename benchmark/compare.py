@@ -21,11 +21,33 @@ from collections import defaultdict
 def load_results(paths: list[str]) -> list[dict]:
     results = []
     for p in paths:
-        for f in glob.glob(p):
-            with open(f) as fp:
-                d = json.load(fp)
-            d["_file"] = f
-            results.append(d)
+        expanded = glob.glob(p)
+        if not expanded:
+            # If it's a directory, glob for JSON files inside
+            from pathlib import Path
+            pp = Path(p)
+            if pp.is_dir():
+                expanded = [str(f) for f in sorted(pp.glob("**/*.json"))]
+        for f in expanded:
+            from pathlib import Path
+            if Path(f).is_dir():
+                # Recursively find JSON files in directory
+                for jf in sorted(Path(f).glob("**/*.json")):
+                    try:
+                        with open(jf) as fp:
+                            d = json.load(fp)
+                        d["_file"] = str(jf)
+                        results.append(d)
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+            else:
+                try:
+                    with open(f) as fp:
+                        d = json.load(fp)
+                    d["_file"] = f
+                    results.append(d)
+                except (json.JSONDecodeError, KeyError):
+                    continue
     return results
 
 

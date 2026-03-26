@@ -18,7 +18,7 @@ python benchmark/run.py --protocol A_IndianPines --method icarl \
     --data_root ~/datasets/rs_cil --seed 0
 
 # 4. Compare results
-python benchmark/compare.py results/ --latex
+python benchmark/compare.py "results/*.json" --latex
 ```
 
 ---

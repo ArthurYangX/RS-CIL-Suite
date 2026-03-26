@@ -259,6 +259,8 @@ def load_protocol_yaml(path: str) -> CILProtocol:
     seed = cfg.get("class_order_seed", 42)
 
     # Optionally shuffle class ordering within each dataset
+    # This permutes which classes go to which tasks
+    permutations: dict[str, list[int]] = {}
     if shuffle:
         import random
         rng = random.Random(seed)
@@ -266,9 +268,7 @@ def load_protocol_yaml(path: str) -> CILProtocol:
             nc = NUM_CLASSES[ds]
             perm = list(range(nc))
             rng.shuffle(perm)
-            # Remap class splits to use permuted order
-            # Store permutation as metadata
-            cfg.setdefault("_class_permutations", {})[ds] = perm
+            permutations[ds] = perm
 
     if proto_type == "within_scene":
         assert len(dataset_order) == 1, "within_scene requires exactly 1 dataset"
@@ -278,12 +278,23 @@ def load_protocol_yaml(path: str) -> CILProtocol:
     else:
         protocol = build_cross_scene(dataset_order, class_splits, NUM_CLASSES)
 
+    # Apply permutation to task class IDs
+    if permutations:
+        for task in protocol.tasks:
+            ds = task.dataset_name
+            if ds in permutations:
+                perm = permutations[ds]
+                task.class_ids = [perm[c] for c in task.class_ids]
+                offset = protocol.offsets.get(ds, 0)
+                task.global_class_ids = [c + offset for c in task.class_ids]
+
     protocol.name = name
 
     # Attach optional metadata for the runner
     protocol.train_ratio = cfg.get("train_ratio", None)
     protocol.class_order_seed = seed
     protocol.shuffle_classes = shuffle
+    protocol._class_permutations = permutations
 
     return protocol
 

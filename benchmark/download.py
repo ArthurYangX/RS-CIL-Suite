@@ -68,10 +68,10 @@ DATASET_SOURCES: dict[str, dict] = {
         ),
         "zip_name": "MUUFL.zip",
         "extract_dir": "MUUFL",
-        "expected_files": ["muufl_gulfport_campus_w_lidar_1.mat"],
+        "expected_files": ["muufl_gulfport_campus_1_hsi_220_label.mat"],
         "note": (
-            "Main file: muufl_gulfport_campus_w_lidar_1.mat inside "
-            "MUUFLGulfportDataCollection/. Labels in MUUFLGulfportSceneLabels/."
+            "Main file: muufl_gulfport_campus_1_hsi_220_label.mat. "
+            "This is the 220-band version with embedded scene labels."
         ),
         "manual_url": "https://github.com/GatorSense/MUUFLGulfport",
     },

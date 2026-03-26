@@ -92,15 +92,33 @@ class GPM(CILMethod):
     # ── Gradient projection ───────────────────────────────────────
 
     def _project_gradients(self):
-        """For each parameter with a stored basis, project out the memory directions."""
+        """For each parameter with a stored basis, project out the memory directions.
+
+        The basis lives in activation (input) space of shape (C_in, k).
+        For Conv2d weights of shape (C_out, C_in, kH, kW), we reshape the
+        gradient to (C_out * kH * kW, C_in), project each row, then reshape back.
+        For Linear weights of shape (C_out, C_in), same logic applies.
+        """
         for name, param in self.model.named_parameters():
             if param.grad is None or name not in self._memory:
                 continue
-            basis = self._memory[name].to(self.device)  # (flat_dim, k)
-            g = param.grad.data.view(-1)                 # (flat_dim,)
-            # Remove components in the memory space
-            proj = basis @ (basis.t() @ g)               # (flat_dim,)
-            param.grad.data -= proj.view_as(param.grad.data)
+            basis = self._memory[name].to(self.device)  # (C_in, k)
+            g = param.grad.data
+            c_in = basis.shape[0]
+
+            if g.ndim == 4:
+                # Conv2d: (C_out, C_in, kH, kW) → (C_out*kH*kW, C_in)
+                c_out, _, kh, kw = g.shape
+                g_2d = g.permute(0, 2, 3, 1).reshape(-1, c_in)
+                proj = g_2d @ basis @ basis.t()    # (N, C_in)
+                param.grad.data -= proj.reshape(c_out, kh, kw, c_in).permute(0, 3, 1, 2)
+            elif g.ndim == 2:
+                # Linear: (C_out, C_in)
+                if g.shape[1] == c_in:
+                    proj = g @ basis @ basis.t()
+                    param.grad.data -= proj
+                # else: dimension mismatch (e.g. head), skip
+            # 1-d bias: skip (no activation-space projection for biases)
 
     # ── Memory update (SVD of activations) ───────────────────────
 

@@ -46,22 +46,25 @@ def get_dataset(
     root: str | Path | None = None,
     patch_size: int = 7,
     pca_components: int = 36,
+    train_ratio: float = 0.1,
 ) -> RSDataset:
     """Instantiate a dataset by name.
 
     Args:
-        name:          Dataset key (e.g. "Trento").
-        root:          Path to the dataset directory.
-                       Falls back to _DEFAULT_ROOTS if None.
-        patch_size:    Spatial patch size (default 7).
+        name:           Dataset key (e.g. "Trento").
+        root:           Path to the dataset directory.
+                        Falls back to _DEFAULT_ROOTS if None.
+        patch_size:     Spatial patch size (default 7).
         pca_components: PCA reduction for HSI (default 36).
+        train_ratio:    Fraction of labelled pixels for training (default 0.1).
     """
     if name not in DATASETS:
         raise ValueError(f"Unknown dataset '{name}'. Available: {list(DATASETS)}")
     cls = DATASETS[name]
     if root is None:
         root = Path(_DEFAULT_ROOTS[name]).expanduser()
-    return cls(root=root, patch_size=patch_size, pca_components=pca_components)
+    return cls(root=root, patch_size=patch_size, pca_components=pca_components,
+               train_ratio=train_ratio)
 
 
 def list_datasets() -> list[str]:
